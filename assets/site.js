@@ -458,7 +458,7 @@
                 <div class="bm-header">
                     <div class="bm-header-inner">
                         <a href="/index.html" class="bm-logo"><span class="bm-logo-mark">🌙</span> BalanceMind</a>
-                        <button class="bm-burger" id="bm-burger" type="button" aria-label="Меню">☰</button>
+                        <button class="bm-burger" id="bm-burger" type="button" aria-label="Меню" aria-expanded="false" aria-controls="bm-nav-links">☰</button>
                         <ul class="bm-nav-links" id="bm-nav-links">${navHtml}</ul>
                         <div class="bm-header-actions">
                             <div style="position:relative;">
@@ -475,8 +475,17 @@
                     </div>
                 </div>`;
 
-            document.getElementById('bm-burger').addEventListener('click', () => {
-                document.getElementById('bm-nav-links').classList.toggle('mobile-open');
+            const burger = document.getElementById('bm-burger');
+            const navLinks = document.getElementById('bm-nav-links');
+            burger.addEventListener('click', () => {
+                const open = navLinks.classList.toggle('mobile-open');
+                burger.setAttribute('aria-expanded', String(open));
+            });
+            document.addEventListener('click', (e) => {
+                if (navLinks.classList.contains('mobile-open') && !navLinks.contains(e.target) && e.target !== burger) {
+                    navLinks.classList.remove('mobile-open');
+                    burger.setAttribute('aria-expanded', 'false');
+                }
             });
             document.getElementById('bm-theme-toggle').addEventListener('click', () => Theme.toggle());
             document.getElementById('bm-notif-btn').addEventListener('click', () => {
@@ -563,10 +572,13 @@
 
             document.getElementById('bm-auth-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
+                const submitBtn = e.target.querySelector('button[type="submit"]');
+                if (submitBtn.disabled) return;
                 const username = document.getElementById('bm-auth-username').value.trim();
                 const password = document.getElementById('bm-auth-password').value;
                 const errorEl = document.getElementById('bm-auth-error');
                 errorEl.textContent = '';
+                submitBtn.disabled = true;
                 try {
                     if (mode === 'login') await Auth.login(username, password);
                     else await Auth.register(username, password, 'user');
@@ -574,7 +586,12 @@
                     this.close();
                 } catch (err) {
                     errorEl.textContent = err.message || 'Что-то пошло не так.';
+                } finally {
+                    submitBtn.disabled = false;
                 }
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && wrap.style.display === 'flex') this.close();
             });
         },
         open() { this._ensure(); document.getElementById('bm-auth-modal').style.display = 'flex'; },
@@ -635,9 +652,11 @@
             body.scrollTop = body.scrollHeight;
         },
         async send() {
+            if (this._sending) return;
             const input = document.getElementById('bm-chat-input');
             const text = input.value.trim();
             if (!text) return;
+            this._sending = true;
             input.value = '';
             this._history.push({ role: 'user', content: text });
             this._renderMessage('user', text);
@@ -665,6 +684,8 @@
             } catch (err) {
                 typing.remove();
                 this._renderMessage('assistant', err.message || 'Не удалось получить ответ. Попробуйте ещё раз чуть позже.');
+            } finally {
+                this._sending = false;
             }
         }
     };

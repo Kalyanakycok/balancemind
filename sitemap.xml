@@ -6,9 +6,14 @@
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://balancemind.vercel.app/advice.html</loc>
+    <loc>https://balancemind.vercel.app/selfanalysis.html</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://balancemind.vercel.app/practices.html</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.8</priority>
   </url>
   <url>
     <loc>https://balancemind.vercel.app/articles.html</loc>
@@ -16,4 +21,18 @@
     <priority>0.8</priority>
   </url>
   <url>
-  
+    <loc>https://balancemind.vercel.app/community.html</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://balancemind.vercel.app/advice.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://balancemind.vercel.app/about.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+</urlset>

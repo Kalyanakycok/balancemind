@@ -392,9 +392,10 @@ a.bm-dropdown-item:hover { background: var(--accent-light); }
         display: flex;
         flex-direction: column;
         position: absolute;
+        z-index: 110;
         top: 100%; left: 0; right: 0;
-        background: var(--glass-bg-strong);
-        backdrop-filter: var(--blur-glass);
+        background: var(--bg-elevated);
+        box-shadow: var(--shadow-card);
         padding: 12px;
         border-bottom: 1px solid var(--glass-border);
     }
