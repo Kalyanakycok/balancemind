@@ -154,6 +154,10 @@ async function loadWorkbook() {
     let users = usersRes.rows;
     if (users.length === 0) {
         // Первый запуск на пустой базе — сид совпадает с исходным store.js.
+        // ВНИМАНИЕ: это дефолтные пароли только для самого первого входа на
+        // свежей базе. Этот файл открытый (публичный репозиторий) — сразу
+        // после первого деплоя смените пароли admin/Potap через страницу
+        // логина, иначе они будут известны любому, кто читает код.
         const seedPlain = [
             { username: 'admin', password: 'admin123', role: 'admin', label: 'Администратор', builtIn: true },
             { username: 'user', password: 'user123', role: 'user', label: 'Пользователь', builtIn: true },
@@ -174,42 +178,72 @@ async function loadWorkbook() {
     };
 }
 
+// ВАЖНО: раньше все четыре persist*-функции делали `DELETE FROM x` (весь
+// стол целиком), затем заново вставляли все строки. Для forum_posts и
+// особенно users это катастрофично: у users.username и forum_posts.id есть
+// внешние ключи с ON DELETE CASCADE (sessions, journal_entries, test_results,
+// forum_comments и т.д.) — удаление ВСЕХ строк users, пусть даже на мгновение
+// перед повторной вставкой, каскадом стирало сессии/дневники/тесты/комментарии
+// у ВСЕХ пользователей при любом сохранении хотя бы одного (логин, регистрация,
+// смена роли, новый пост на форуме). Теперь — точечный UPSERT: удаляются
+// только строки, которых больше нет в новом наборе, остальные обновляются
+// на месте без потери id и без каскадного удаления связанных данных.
 async function persistUsers(users) {
     const client = getPool();
-    await client.query('DELETE FROM users');
+    const usernames = users.map((u) => u.username);
+    await client.query(
+        usernames.length ? 'DELETE FROM users WHERE username <> ALL($1::text[])' : 'DELETE FROM users',
+        usernames.length ? [usernames] : []
+    );
     for (const u of users) {
         await client.query(
-            'INSERT INTO users (username, password, role, label, built_in) VALUES ($1,$2,$3,$4,$5)',
+            `INSERT INTO users (username, password, role, label, built_in) VALUES ($1,$2,$3,$4,$5)
+             ON CONFLICT (username) DO UPDATE SET password = EXCLUDED.password, role = EXCLUDED.role, label = EXCLUDED.label, built_in = EXCLUDED.built_in`,
             [u.username, u.password, u.role, u.label, !!u.builtIn]
         );
     }
 }
 async function persistAppeals(appeals) {
     const client = getPool();
-    await client.query('DELETE FROM appeals');
+    const ids = appeals.map((a) => String(a.id));
+    await client.query(
+        ids.length ? 'DELETE FROM appeals WHERE id <> ALL($1::text[])' : 'DELETE FROM appeals',
+        ids.length ? [ids] : []
+    );
     for (const a of appeals) {
         await client.query(
-            'INSERT INTO appeals (id, "from", subject, message, date) VALUES ($1,$2,$3,$4,$5)',
+            `INSERT INTO appeals (id, "from", subject, message, date) VALUES ($1,$2,$3,$4,$5)
+             ON CONFLICT (id) DO UPDATE SET "from" = EXCLUDED."from", subject = EXCLUDED.subject, message = EXCLUDED.message, date = EXCLUDED.date`,
             [a.id, a.from, a.subject || '', a.message || '', a.date || '']
         );
     }
 }
 async function persistForumPosts(posts) {
     const client = getPool();
-    await client.query('DELETE FROM forum_posts');
+    const ids = posts.map((p) => String(p.id));
+    await client.query(
+        ids.length ? 'DELETE FROM forum_posts WHERE id <> ALL($1::text[])' : 'DELETE FROM forum_posts',
+        ids.length ? [ids] : []
+    );
     for (const p of posts) {
         await client.query(
-            'INSERT INTO forum_posts (id, author, title, message, date) VALUES ($1,$2,$3,$4,$5)',
+            `INSERT INTO forum_posts (id, author, title, message, date) VALUES ($1,$2,$3,$4,$5)
+             ON CONFLICT (id) DO UPDATE SET author = EXCLUDED.author, title = EXCLUDED.title, message = EXCLUDED.message, date = EXCLUDED.date`,
             [p.id, p.author, p.title || '', p.message || '', p.date || '']
         );
     }
 }
 async function persistForumComments(comments) {
     const client = getPool();
-    await client.query('DELETE FROM forum_comments');
+    const ids = comments.map((c) => String(c.id));
+    await client.query(
+        ids.length ? 'DELETE FROM forum_comments WHERE id <> ALL($1::text[])' : 'DELETE FROM forum_comments',
+        ids.length ? [ids] : []
+    );
     for (const c of comments) {
         await client.query(
-            'INSERT INTO forum_comments (id, post_id, author, message, date) VALUES ($1,$2,$3,$4,$5)',
+            `INSERT INTO forum_comments (id, post_id, author, message, date) VALUES ($1,$2,$3,$4,$5)
+             ON CONFLICT (id) DO UPDATE SET post_id = EXCLUDED.post_id, author = EXCLUDED.author, message = EXCLUDED.message, date = EXCLUDED.date`,
             [c.id, c.postId, c.author, c.message || '', c.date || '']
         );
     }
@@ -406,6 +440,57 @@ async function setNotifRead(username, ids) {
     }
 }
 
+// ---------- админ: обзор всех пользователей, сброс пароля, удаление ----------
+// Всё это уже защищено на уровне api/admin.js проверкой requireAuth + role
+// === 'admin' — сюда обращаются только после этой проверки.
+
+async function adminGetUsersOverview() {
+    await ensureSchema();
+    const client = getPool();
+    const users = (await client.query('SELECT username, role, label FROM users ORDER BY username')).rows;
+    const overview = [];
+    for (const u of users) {
+        const [testsRes, journalCountRes, journalRecentRes] = await Promise.all([
+            client.query(
+                `SELECT DISTINCT ON (test_id) test_id, score, status, date FROM test_results
+                 WHERE username = $1 ORDER BY test_id, created_at DESC`,
+                [u.username]
+            ),
+            client.query('SELECT count(*) FROM journal_entries WHERE username = $1', [u.username]),
+            client.query(
+                'SELECT title, note, mood, date FROM journal_entries WHERE username = $1 ORDER BY created_at DESC LIMIT 3',
+                [u.username]
+            )
+        ]);
+        overview.push({
+            username: u.username,
+            role: u.role,
+            label: u.label,
+            latestTests: testsRes.rows,
+            journalCount: Number(journalCountRes.rows[0].count),
+            recentJournal: journalRecentRes.rows
+        });
+    }
+    return overview;
+}
+
+async function adminSetPassword(username, hashedPassword) {
+    await ensureSchema();
+    const client = getPool();
+    const res = await client.query('UPDATE users SET password = $1 WHERE username = $2', [hashedPassword, username]);
+    await client.query('DELETE FROM sessions WHERE username = $1', [username]);
+    return res.rowCount > 0;
+}
+
+async function adminDeleteUser(username) {
+    await ensureSchema();
+    const client = getPool();
+    // ON DELETE CASCADE на внешних ключах чистит sessions/journal_entries/
+    // checklist_items/mood_logs/daily_plans/test_results/notif_read сам.
+    const res = await client.query('DELETE FROM users WHERE username = $1', [username]);
+    return res.rowCount > 0;
+}
+
 module.exports = {
     loadWorkbook, saveWorkbook,
     getUsers, setUsers,
@@ -420,5 +505,6 @@ module.exports = {
     getMood, setMood,
     getDailyPlan, setDailyPlan,
     getTestResults, saveTestResult,
-    getNotifRead, setNotifRead
+    getNotifRead, setNotifRead,
+    adminGetUsersOverview, adminSetPassword, adminDeleteUser
 };

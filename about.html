@@ -70,6 +70,30 @@
     </div>
 </section>
 
+<section class="bm-section" style="padding-top:0; display:none;" id="account-section">
+    <div class="bm-container" style="max-width:480px;">
+        <div class="glass-card" style="padding:26px;">
+            <h3>Мой аккаунт</h3>
+            <p style="margin-top:-6px;">Смена пароля требует знания текущего. Если пароль забыт — попросите администратора сбросить его.</p>
+            <form id="change-password-form" style="display:flex; flex-direction:column; gap:10px;">
+                <input class="bm-input" id="cp-current" type="password" placeholder="Текущий пароль" required autocomplete="current-password">
+                <input class="bm-input" id="cp-new" type="password" placeholder="Новый пароль (от 6 символов)" required autocomplete="new-password" minlength="6">
+                <button class="btn btn-secondary" type="submit">Сменить пароль</button>
+            </form>
+        </div>
+    </div>
+</section>
+
+<section class="bm-section" style="padding-top:0; display:none;" id="admin-panel-section">
+    <div class="bm-container" style="max-width:820px;">
+        <div class="glass-card" style="padding:26px;">
+            <h3>Панель администратора</h3>
+            <p style="margin-top:-6px;">Роли, сброс паролей, удаление аккаунтов, последние результаты тестов и записи в дневнике каждого пользователя.</p>
+            <div id="admin-users-list"></div>
+        </div>
+    </div>
+</section>
+
 <footer class="bm-footer">
     <div class="bm-footer-inner">
         <div class="bm-logo">🌙 BalanceMind</div>
@@ -87,5 +111,172 @@
 </footer>
 
 <script src="/assets/site.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    const state = BM.Auth.getState();
+    if (!state) return;
+
+    // Смена своего пароля — доступно любому залогиненному пользователю.
+    document.getElementById('account-section').style.display = 'block';
+    document.getElementById('change-password-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        if (submitBtn.disabled) return;
+        const currentPassword = document.getElementById('cp-current').value;
+        const newPassword = document.getElementById('cp-new').value;
+        submitBtn.disabled = true;
+        try {
+            await BM.Auth.changePassword(currentPassword, newPassword);
+            BM.Toast.show('Пароль изменён');
+            e.target.reset();
+        } catch (err) {
+            BM.Toast.show(err.message, 'error');
+        } finally {
+            submitBtn.disabled = false;
+        }
+    });
+
+    if (state.role !== 'admin') return;
+    document.getElementById('admin-panel-section').style.display = 'block';
+
+    function fmtTests(latestTests) {
+        const labels = { stress: 'Стресс', anxiety: 'Тревожность', burnout: 'Выгорание' };
+        if (!latestTests.length) return 'тесты ещё не пройдены';
+        return latestTests.map((t) => `${labels[t.test_id] || t.test_id}: ${t.score}/44 (${t.status}, ${t.date})`).join(' · ');
+    }
+
+    async function renderUsers() {
+        const res = await BM.Auth.authFetch('/api/admin?action=overview');
+        if (!res.ok) { BM.Toast.show('Не удалось загрузить список пользователей.', 'error'); return; }
+        const overview = await res.json();
+        const list = document.getElementById('admin-users-list');
+        list.innerHTML = '';
+        overview.forEach((u) => {
+            const card = document.createElement('div');
+            card.className = 'glass-card';
+            card.style.cssText = 'padding:16px 18px;margin-bottom:12px;';
+
+            const top = document.createElement('div');
+            top.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;';
+            const left = document.createElement('div');
+            const name = document.createElement('strong');
+            name.textContent = u.username;
+            const roleSpan = document.createElement('span');
+            roleSpan.style.cssText = 'margin-left:8px;color:var(--text-muted);font-size:0.82rem;';
+            roleSpan.textContent = u.role === 'admin' ? 'администратор' : 'пользователь';
+            left.append(name, roleSpan);
+
+            const actions = document.createElement('div');
+            actions.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
+
+            const roleBtn = document.createElement('button');
+            roleBtn.className = u.role === 'admin' ? 'btn-ghost' : 'btn btn-secondary';
+            roleBtn.style.cssText = 'padding:6px 12px;font-size:0.85rem;';
+            roleBtn.textContent = u.role === 'admin' ? 'Снять права админа' : 'Сделать админом';
+            roleBtn.addEventListener('click', async () => {
+                roleBtn.disabled = true;
+                try {
+                    const newRole = u.role === 'admin' ? 'user' : 'admin';
+                    const res2 = await BM.Auth.authFetch('/api/users', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: u.username, role: newRole })
+                    });
+                    const data = await res2.json();
+                    if (!res2.ok) throw new Error(data.error || 'Не удалось изменить роль.');
+                    BM.Toast.show('Роль обновлена');
+                    renderUsers();
+                } catch (err) {
+                    BM.Toast.show(err.message, 'error');
+                    roleBtn.disabled = false;
+                }
+            });
+
+            const resetBtn = document.createElement('button');
+            resetBtn.className = 'btn-ghost';
+            resetBtn.style.cssText = 'padding:6px 12px;font-size:0.85rem;';
+            resetBtn.textContent = 'Сбросить пароль';
+            resetBtn.addEventListener('click', async () => {
+                if (!confirm(`Сбросить пароль пользователя «${u.username}»? Будет сгенерирован новый временный пароль.`)) return;
+                resetBtn.disabled = true;
+                try {
+                    const res2 = await BM.Auth.authFetch('/api/admin?action=reset-password', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: u.username })
+                    });
+                    const data = await res2.json();
+                    if (!res2.ok) throw new Error(data.error || 'Не удалось сбросить пароль.');
+                    alert(`Новый пароль для «${u.username}»: ${data.newPassword}\n\nСообщите его пользователю — сейчас он показан только один раз.`);
+                } catch (err) {
+                    BM.Toast.show(err.message, 'error');
+                } finally {
+                    resetBtn.disabled = false;
+                }
+            });
+
+            const delBtn = document.createElement('button');
+            delBtn.className = 'btn-danger';
+            delBtn.style.cssText = 'padding:6px 12px;font-size:0.85rem;border-radius:999px;';
+            delBtn.textContent = 'Удалить';
+            delBtn.disabled = u.username === state.username;
+            delBtn.title = u.username === state.username ? 'Нельзя удалить свой же аккаунт, пока вы в него вошли' : '';
+            delBtn.addEventListener('click', async () => {
+                if (!confirm(`Удалить аккаунт «${u.username}»? Это удалит все его данные (дневник, тесты, чек-лист) без возможности восстановления.`)) return;
+                delBtn.disabled = true;
+                try {
+                    const res2 = await BM.Auth.authFetch(`/api/admin?action=delete-user&username=${encodeURIComponent(u.username)}`, { method: 'DELETE' });
+                    const data = await res2.json();
+                    if (!res2.ok) throw new Error(data.error || 'Не удалось удалить пользователя.');
+                    BM.Toast.show('Пользователь удалён');
+                    renderUsers();
+                } catch (err) {
+                    BM.Toast.show(err.message, 'error');
+                    delBtn.disabled = false;
+                }
+            });
+
+            actions.append(roleBtn, resetBtn, delBtn);
+            top.append(left, actions);
+            card.appendChild(top);
+
+            const testsLine = document.createElement('div');
+            testsLine.style.cssText = 'margin-top:10px;font-size:0.82rem;color:var(--text-muted);';
+            testsLine.textContent = fmtTests(u.latestTests);
+            card.appendChild(testsLine);
+
+            const journalLine = document.createElement('div');
+            journalLine.style.cssText = 'margin-top:6px;font-size:0.82rem;color:var(--text-muted);';
+            journalLine.textContent = `Дневник: ${u.journalCount} записей`;
+            card.appendChild(journalLine);
+
+            if (u.recentJournal.length) {
+                const details = document.createElement('details');
+                details.style.cssText = 'margin-top:8px;font-size:0.85rem;';
+                const summary = document.createElement('summary');
+                summary.style.cssText = 'cursor:pointer;color:var(--accent-color);';
+                summary.textContent = 'Показать последние записи';
+                details.appendChild(summary);
+                u.recentJournal.forEach((e) => {
+                    const entryEl = document.createElement('div');
+                    entryEl.style.cssText = 'margin-top:6px;padding:8px 10px;background:var(--bg-elevated);border-radius:var(--radius-sm);';
+                    const head = document.createElement('div');
+                    head.style.cssText = 'font-weight:600;';
+                    head.textContent = `${e.title} ${e.mood || ''} — ${e.date}`;
+                    const body = document.createElement('div');
+                    body.style.cssText = 'color:var(--text-muted);margin-top:2px;';
+                    body.textContent = e.note;
+                    entryEl.append(head, body);
+                    details.appendChild(entryEl);
+                });
+                card.appendChild(details);
+            }
+
+            list.appendChild(card);
+        });
+    }
+    renderUsers();
+});
+</script>
 </body>
 </html>

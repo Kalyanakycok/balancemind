@@ -93,6 +93,8 @@ async function loadWorkbook() {
     ensureSheet(wb, NOTIF_READ_SHEET, NOTIF_READ_COLUMNS);
 
     if (!existingUrl) {
+        // ВНИМАНИЕ: дефолтные пароли только для первого входа на свежей базе.
+        // Файл публичный — смените пароли admin/Potap сразу после деплоя.
         const seedUsersPlain = [
             { username: 'admin', password: 'admin123', role: 'admin', label: 'Администратор', builtIn: true },
             { username: 'user', password: 'user123', role: 'user', label: 'Пользователь', builtIn: true },
@@ -290,6 +292,58 @@ async function setNotifRead(username, ids) {
     await saveWorkbook(wb);
 }
 
+// ---------- админ: обзор всех пользователей, сброс пароля, удаление ----------
+
+async function adminGetUsersOverview() {
+    const wb = await loadWorkbook();
+    const users = getUsers(wb);
+    const allJournal = readRows(wb.getWorksheet(JOURNAL_SHEET), JOURNAL_COLUMNS);
+    const allTests = readRows(wb.getWorksheet(TEST_RESULTS_SHEET), TEST_RESULTS_COLUMNS);
+    return users.map((u) => {
+        const myJournal = allJournal.filter((e) => e.username === u.username);
+        const myTests = allTests.filter((r) => r.username === u.username);
+        const latestByTest = {};
+        myTests.forEach((r) => { latestByTest[r.testId] = r; });
+        return {
+            username: u.username,
+            role: u.role,
+            label: u.label,
+            latestTests: Object.values(latestByTest).map((r) => ({ test_id: r.testId, score: r.score, status: r.status, date: r.date })),
+            journalCount: myJournal.length,
+            recentJournal: myJournal.slice(-3).reverse().map((e) => ({ title: e.title, note: e.note, mood: e.mood, date: e.date }))
+        };
+    });
+}
+
+async function adminSetPassword(username, hashedPassword) {
+    const wb = await loadWorkbook();
+    const users = getUsers(wb);
+    const target = users.find((u) => u.username === username);
+    if (!target) return false;
+    target.password = hashedPassword;
+    setUsers(wb, users);
+    const sessions = readRows(wb.getWorksheet(SESSIONS_SHEET), SESSION_COLUMNS).filter((s) => s.username !== username);
+    replaceSheet(wb, SESSIONS_SHEET, SESSION_COLUMNS, sessions);
+    await saveWorkbook(wb);
+    return true;
+}
+
+async function adminDeleteUser(username) {
+    const wb = await loadWorkbook();
+    const users = getUsers(wb);
+    if (!users.some((u) => u.username === username)) return false;
+    setUsers(wb, users.filter((u) => u.username !== username));
+    replaceSheet(wb, SESSIONS_SHEET, SESSION_COLUMNS, readRows(wb.getWorksheet(SESSIONS_SHEET), SESSION_COLUMNS).filter((r) => r.username !== username));
+    replaceSheet(wb, JOURNAL_SHEET, JOURNAL_COLUMNS, readRows(wb.getWorksheet(JOURNAL_SHEET), JOURNAL_COLUMNS).filter((r) => r.username !== username));
+    replaceSheet(wb, CHECKLIST_SHEET, CHECKLIST_COLUMNS, readRows(wb.getWorksheet(CHECKLIST_SHEET), CHECKLIST_COLUMNS).filter((r) => r.username !== username));
+    replaceSheet(wb, MOOD_SHEET, MOOD_COLUMNS, readRows(wb.getWorksheet(MOOD_SHEET), MOOD_COLUMNS).filter((r) => r.username !== username));
+    replaceSheet(wb, PLAN_SHEET, PLAN_COLUMNS, readRows(wb.getWorksheet(PLAN_SHEET), PLAN_COLUMNS).filter((r) => r.username !== username));
+    replaceSheet(wb, TEST_RESULTS_SHEET, TEST_RESULTS_COLUMNS, readRows(wb.getWorksheet(TEST_RESULTS_SHEET), TEST_RESULTS_COLUMNS).filter((r) => r.username !== username));
+    replaceSheet(wb, NOTIF_READ_SHEET, NOTIF_READ_COLUMNS, readRows(wb.getWorksheet(NOTIF_READ_SHEET), NOTIF_READ_COLUMNS).filter((r) => r.username !== username));
+    await saveWorkbook(wb);
+    return true;
+}
+
 module.exports = {
     loadWorkbook, saveWorkbook,
     getUsers, setUsers,
@@ -304,5 +358,6 @@ module.exports = {
     getMood, setMood,
     getDailyPlan, setDailyPlan,
     getTestResults, saveTestResult,
-    getNotifRead, setNotifRead
+    getNotifRead, setNotifRead,
+    adminGetUsersOverview, adminSetPassword, adminDeleteUser
 };

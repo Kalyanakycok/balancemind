@@ -118,6 +118,16 @@
                 } catch { /* сеть недоступна — всё равно чистим локально */ }
             }
             this.clear();
+        },
+        async changePassword(currentPassword, newPassword) {
+            const res = await this.authFetch('/api/auth?action=change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ currentPassword, newPassword })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Не удалось сменить пароль.');
+            return data;
         }
     };
 
