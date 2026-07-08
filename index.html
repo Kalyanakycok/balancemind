@@ -11,7 +11,7 @@
 <link rel="icon" href="/icons/icon-192.png">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <meta property="og:title" content="BalanceMind">
-<meta property="og:description" content="Тесты на стресс, тревожность и выгорание, дыхательные практики и дневник настроения — в одном месте.">
+<meta property="og:description" content="Шесть тестов самопознания, дыхательные практики и дневник настроения — в одном месте.">
 <meta property="og:image" content="/og-image.png">
 <link rel="stylesheet" href="/assets/site.css">
 <style>
@@ -45,6 +45,12 @@
     .pillar-link:hover { color: var(--accent-hover); }
     .pillar-icon { font-size: 1.8rem; margin-bottom: 10px; display: block; }
     .hero-actions { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; }
+    .hero-art { max-width: 260px; margin: 0 auto 18px; }
+    .hero-art circle.orbit { animation: bmOrbitPulse 3.5s ease-in-out infinite; transform-origin: center; }
+    .hero-art circle.orbit:nth-child(2) { animation-delay: 0.6s; }
+    .hero-art circle.orbit:nth-child(3) { animation-delay: 1.2s; }
+    @keyframes bmOrbitPulse { 0%, 100% { opacity: 0.35; transform: scale(1); } 50% { opacity: 0.9; transform: scale(1.25); } }
+    @media (prefers-reduced-motion: reduce) { .hero-art circle.orbit { animation: none; } }
 </style>
 </head>
 <body>
@@ -52,6 +58,27 @@
 
 <section class="bm-hero">
     <div class="bm-container">
+        <div class="hero-art">
+            <svg viewBox="0 0 200 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Абстрактная иллюстрация человека в спокойной позе в окружении мягкого свечения">
+                <defs>
+                    <linearGradient id="heroGrad" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#8b6bff"/>
+                        <stop offset="100%" stop-color="#22d3c9"/>
+                    </linearGradient>
+                    <radialGradient id="heroGlow" cx="50%" cy="45%" r="60%">
+                        <stop offset="0%" stop-color="#8b6bff" stop-opacity="0.35"/>
+                        <stop offset="100%" stop-color="#8b6bff" stop-opacity="0"/>
+                    </radialGradient>
+                </defs>
+                <circle cx="100" cy="85" r="80" fill="url(#heroGlow)"/>
+                <ellipse cx="100" cy="150" rx="55" ry="8" fill="#8b6bff" opacity="0.15"/>
+                <path d="M55 140 Q55 100 75 92 Q65 78 78 66 Q65 60 72 46 Q100 34 128 46 Q135 60 122 66 Q135 78 125 92 Q145 100 145 140 Z" fill="url(#heroGrad)"/>
+                <circle cx="100" cy="40" r="18" fill="url(#heroGrad)"/>
+                <circle class="orbit" cx="40" cy="55" r="4" fill="#22d3c9"/>
+                <circle class="orbit" cx="165" cy="70" r="5" fill="#ff6fa5"/>
+                <circle class="orbit" cx="150" cy="35" r="3" fill="#8b6bff"/>
+            </svg>
+        </div>
         <span class="bm-badge">Инструмент для ежедневной поддержки</span>
         <h1>Стресс легче держать под контролем,<br>когда вы понимаете, что с вами происходит</h1>
         <p class="lead">BalanceMind помогает заметить своё состояние раньше, чем оно перерастёт в перегрузку: короткий тест покажет текущий уровень стресса, практики — что делать прямо сейчас, а дневник — как всё меняется со временем.</p>
@@ -70,7 +97,7 @@
             <div class="bm-card glass-card">
                 <span class="pillar-icon">📊</span>
                 <h3>Тесты и дневник</h3>
-                <p>Пройдите тесты на стресс, тревожность или выгорание за пару минут и фиксируйте настроение в личном дневнике, чтобы видеть закономерности, а не гадать задним числом.</p>
+                <p>Пройдите один из шести тестов самопознания за пару минут и фиксируйте настроение в личном дневнике, чтобы видеть закономерности, а не гадать задним числом.</p>
                 <a class="pillar-link" href="selfanalysis.html">Пройти тест →</a>
             </div>
             <div class="bm-card glass-card">
