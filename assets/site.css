@@ -345,12 +345,18 @@ label.bm-label { display: block; font-size: 0.85rem; color: var(--text-muted); m
 }
 .bm-dropdown.open { display: flex; }
 .bm-dropdown-item {
+    display: block;
     padding: 10px 12px;
     border-radius: var(--radius-sm);
     background: var(--bg-card);
     font-size: 0.88rem;
+    color: var(--text-main);
+    text-decoration: none;
+    line-height: 1.5;
 }
+a.bm-dropdown-item:hover { background: var(--accent-light); }
 .bm-dropdown-item.unread { border-left: 3px solid var(--accent-color); }
+.bm-dropdown-empty { padding: 16px 12px; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
 
 .bm-burger {
     display: none;

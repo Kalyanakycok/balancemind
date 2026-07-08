@@ -59,7 +59,7 @@
         <div class="bm-logo">🌙 BalanceMind</div>
         <div class="bm-footer-links">
             <a href="/index.html">Главная</a>
-            <a href="/selfanalysis.html">Тест на стресс</a>
+            <a href="/selfanalysis.html">Тесты и дневник</a>
             <a href="/practices.html">Практики</a>
             <a href="/articles.html">Статьи</a>
             <a href="/community.html">Сообщество</a>
@@ -185,12 +185,16 @@ document.addEventListener('DOMContentLoaded', () => {
             replyBtn.textContent = 'Отправить';
             replyBtn.addEventListener('click', async () => {
                 const msg = replyInput.value.trim();
-                if (!msg) return;
+                if (!msg || replyBtn.disabled) return;
+                replyBtn.disabled = true;
                 try {
                     await BM.Forum.createComment(post.id, msg);
                     replyInput.value = '';
                     loadAll();
-                } catch (err) { BM.Toast.show(err.message, 'error'); }
+                } catch (err) {
+                    BM.Toast.show(err.message, 'error');
+                    replyBtn.disabled = false;
+                }
             });
             replyRow.append(replyInput, replyBtn);
             commentsWrap.appendChild(replyRow);
@@ -205,12 +209,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const title = document.getElementById('post-title').value.trim();
         const message = document.getElementById('post-message').value.trim();
         if (!title || !message) return;
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        if (submitBtn.disabled) return;
+        submitBtn.disabled = true;
         try {
             await BM.Forum.createPost(title, message);
             document.getElementById('new-post-form').reset();
             BM.Toast.show('Тема опубликована');
             loadAll();
-        } catch (err) { BM.Toast.show(err.message, 'error'); }
+        } catch (err) {
+            BM.Toast.show(err.message, 'error');
+        } finally {
+            submitBtn.disabled = false;
+        }
     });
 
     loadAll();

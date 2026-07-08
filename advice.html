@@ -70,7 +70,7 @@
         <div class="bm-logo">🌙 BalanceMind</div>
         <div class="bm-footer-links">
             <a href="/index.html">Главная</a>
-            <a href="/selfanalysis.html">Тест на стресс</a>
+            <a href="/selfanalysis.html">Тесты и дневник</a>
             <a href="/practices.html">Практики</a>
             <a href="/articles.html">Статьи</a>
             <a href="/community.html">Сообщество</a>
@@ -89,6 +89,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const subject = document.getElementById('appeal-subject').value.trim();
         const message = document.getElementById('appeal-message').value.trim();
         if (!subject || !message) return;
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        if (submitBtn.disabled) return;
+        submitBtn.disabled = true;
         const state = BM.Auth.getState();
         try {
             const res = await fetch('/api/appeals', {
@@ -102,6 +105,8 @@ document.addEventListener('DOMContentLoaded', () => {
             e.target.reset();
         } catch (err) {
             BM.Toast.show(err.message, 'error');
+        } finally {
+            submitBtn.disabled = false;
         }
     });
 });

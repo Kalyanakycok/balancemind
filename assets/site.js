@@ -9,6 +9,18 @@
     const AUTH_KEY = 'balance_auth';
     const THEME_KEY = 'balance_theme';
 
+    // Единый набор эмодзи настроения — используется везде (главная, тест,
+    // дневник), чтобы сохранённое значение всегда подсвечивалось как выбранное
+    // независимо от того, на какой странице его сохранили.
+    const MOOD_OPTIONS = [
+        { mood: '😀', label: 'Отлично' },
+        { mood: '🙂', label: 'Хорошо' },
+        { mood: '😐', label: 'Нормально' },
+        { mood: '😔', label: 'Тяжело' },
+        { mood: '😣', label: 'Очень тяжело' },
+        { mood: '😴', label: 'Вымотан(а)' }
+    ];
+
     // ---------------------------------------------------------------
     // Escape — защита от XSS при вставке пользовательского текста в innerHTML
     // ---------------------------------------------------------------
@@ -346,11 +358,85 @@
     };
 
     // ---------------------------------------------------------------
+    // Notifications — персональные напоминания на основе реальных данных
+    // пользователя (когда был последний тест, есть ли записи в дневнике,
+    // отмечен ли план на сегодня). Прочитанные — хранятся через
+    // PersonalData.getNotifRead()/setNotifRead(), как и раньше.
+    // ---------------------------------------------------------------
+    const Notifications = {
+        async generate() {
+            if (!Auth.isLoggedIn()) {
+                return [{ id: 'guest', text: 'Войдите в аккаунт, чтобы получать персональные напоминания.', href: null }];
+            }
+            const notifs = [];
+            const [testResults, journal, plan] = await Promise.all([
+                PersonalData.getTestResults('stress'),
+                PersonalData.getJournal(),
+                PersonalData.getDailyPlan()
+            ]);
+
+            if (!testResults.length) {
+                notifs.push({ id: 'test-none', text: 'Вы ещё не проходили тест на стресс — самое время начать.', href: '/selfanalysis.html' });
+            } else {
+                const last = testResults[testResults.length - 1];
+                const lastTime = Date.parse(last.timestamp || '') || 0;
+                const daysSince = lastTime ? Math.floor((Date.now() - lastTime) / 86400000) : 0;
+                if (daysSince >= 7) {
+                    notifs.push({ id: `test-stale-${Math.floor(daysSince / 7)}`, text: `Прошло ${daysSince} дн. с последнего теста на стресс — стоит пройти снова.`, href: '/selfanalysis.html' });
+                }
+            }
+
+            if (!journal.length) {
+                notifs.push({ id: 'journal-none', text: 'Дневник пока пуст — первая запись помогает заметить закономерности.', href: '/selfanalysis.html' });
+            }
+
+            const planDoneToday = Object.values(plan || {}).some(Boolean);
+            if (!planDoneToday) {
+                notifs.push({ id: 'plan-today', text: 'План на сегодня ещё не отмечен — загляните в «Практики».', href: '/practices.html' });
+            }
+
+            if (!notifs.length) {
+                notifs.push({ id: 'all-good', text: 'Вы молодец — на сегодня всё отмечено. Загляните позже.', href: null });
+            }
+            return notifs;
+        },
+        async render() {
+            const list = document.getElementById('bm-notif-dropdown');
+            const badge = document.getElementById('bm-notif-badge');
+            if (!list || !badge) return;
+            const notifs = await this.generate();
+            const readIds = Auth.isLoggedIn() ? await PersonalData.getNotifRead() : [];
+            list.innerHTML = '';
+            notifs.forEach((n) => {
+                const unread = !readIds.includes(n.id);
+                const item = document.createElement(n.href ? 'a' : 'div');
+                if (n.href) item.href = n.href;
+                item.className = 'bm-dropdown-item' + (unread ? ' unread' : '');
+                item.textContent = n.text;
+                list.appendChild(item);
+            });
+            const unreadCount = notifs.filter((n) => !readIds.includes(n.id)).length;
+            if (unreadCount > 0) {
+                badge.style.display = 'flex';
+                badge.textContent = String(unreadCount);
+            } else {
+                badge.style.display = 'none';
+            }
+            this._lastIds = notifs.map((n) => n.id);
+        },
+        async markAllRead() {
+            if (!Auth.isLoggedIn() || !this._lastIds) return;
+            await PersonalData.setNotifRead(this._lastIds);
+            this.render();
+        }
+    };
+
+    // ---------------------------------------------------------------
     // Header — общий хедер/nav/меню входа, монтируется в <div id="site-header">
     // ---------------------------------------------------------------
     const NAV_ITEMS = [
         { href: '/index.html', label: 'Главная' },
-        { href: '/selfanalysis.html', label: 'Тест на стресс' },
+        { href: '/selfanalysis.html', label: 'Тесты' },
         { href: '/practices.html', label: 'Практики' },
         { href: '/articles.html', label: 'Статьи' },
         { href: '/community.html', label: 'Сообщество' },
@@ -394,7 +480,11 @@
             });
             document.getElementById('bm-theme-toggle').addEventListener('click', () => Theme.toggle());
             document.getElementById('bm-notif-btn').addEventListener('click', () => {
-                document.getElementById('bm-notif-dropdown').classList.toggle('open');
+                const dd = document.getElementById('bm-notif-dropdown');
+                dd.classList.toggle('open');
+                if (dd.classList.contains('open')) {
+                    setTimeout(() => Notifications.markAllRead(), 1500);
+                }
             });
             document.addEventListener('click', (e) => {
                 const dd = document.getElementById('bm-notif-dropdown');
@@ -402,7 +492,8 @@
             });
 
             this.renderAuthSlot();
-            document.addEventListener('bm:auth-changed', () => this.renderAuthSlot());
+            Notifications.render();
+            document.addEventListener('bm:auth-changed', () => { this.renderAuthSlot(); Notifications.render(); });
         },
 
         renderAuthSlot() {
@@ -587,5 +678,5 @@
         ChatWidget.mount();
     });
 
-    window.BM = { Escape, Toast, Auth, PersonalData, Forum, Theme, Header, AuthModal, ChatWidget };
+    window.BM = { Escape, Toast, Auth, PersonalData, Forum, Theme, Header, AuthModal, ChatWidget, Notifications, MOOD_OPTIONS };
 })();
