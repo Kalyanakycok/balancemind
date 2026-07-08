@@ -77,7 +77,7 @@
             return fetch(url, Object.assign({}, opts, { headers }));
         },
         async login(username, password) {
-            const res = await fetch('/api/login', {
+            const res = await fetch('/api/auth?action=login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
@@ -88,7 +88,7 @@
             return data;
         },
         async register(username, password, role = 'user') {
-            const res = await fetch('/api/register', {
+            const res = await fetch('/api/auth?action=register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password, role })
@@ -102,7 +102,7 @@
             const state = this.getState();
             if (state && state.token) {
                 try {
-                    await fetch('/api/logout', { method: 'POST', headers: { Authorization: `Bearer ${state.token}` } });
+                    await fetch('/api/auth?action=logout', { method: 'POST', headers: { Authorization: `Bearer ${state.token}` } });
                 } catch { /* сеть недоступна — всё равно чистим локально */ }
             }
             this.clear();
@@ -194,14 +194,14 @@
 
         async getMood() {
             if (Auth.isLoggedIn()) {
-                const res = await Auth.authFetch('/api/mood');
+                const res = await Auth.authFetch('/api/profile?type=mood');
                 return res.ok ? (await res.json()).mood : null;
             }
             return readGuest('mood', null);
         },
         async setMood(mood) {
             if (Auth.isLoggedIn()) {
-                await Auth.authFetch('/api/mood', {
+                await Auth.authFetch('/api/profile?type=mood', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ mood })
@@ -213,14 +213,14 @@
 
         async getDailyPlan() {
             if (Auth.isLoggedIn()) {
-                const res = await Auth.authFetch('/api/daily-plan');
+                const res = await Auth.authFetch('/api/profile?type=daily-plan');
                 return res.ok ? res.json() : {};
             }
             return readGuest('daily_plan', {});
         },
         async setDailyPlan(state) {
             if (Auth.isLoggedIn()) {
-                await Auth.authFetch('/api/daily-plan', {
+                await Auth.authFetch('/api/profile?type=daily-plan', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ state })
@@ -255,14 +255,14 @@
 
         async getNotifRead() {
             if (Auth.isLoggedIn()) {
-                const res = await Auth.authFetch('/api/notif-read');
+                const res = await Auth.authFetch('/api/profile?type=notif-read');
                 return res.ok ? res.json() : [];
             }
             return readGuest('notif_read', []);
         },
         async setNotifRead(ids) {
             if (Auth.isLoggedIn()) {
-                await Auth.authFetch('/api/notif-read', {
+                await Auth.authFetch('/api/profile?type=notif-read', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ ids })
