@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="view-transition" content="same-origin">
+<title>BalanceMind — управляйте стрессом осознанно</title>
+<meta name="description" content="BalanceMind — тест на уровень стресса, дыхательные практики, личный дневник настроения и сообщество поддержки. Инструмент для тех, кто хочет лучше понимать себя.">
+<meta name="theme-color" content="#090b14">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<meta property="og:title" content="BalanceMind">
+<meta property="og:description" content="Тест на стресс, дыхательные практики и дневник настроения — в одном месте.">
+<meta property="og:image" content="/og-image.png">
+<link rel="stylesheet" href="/assets/site.css">
+<style>
+    .mood-picker { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 26px; }
+    .mood-option {
+        width: 54px; height: 54px;
+        border-radius: 50%;
+        background: var(--bg-elevated);
+        border: 1px solid var(--glass-border);
+        font-size: 1.5rem;
+        display: flex; align-items: center; justify-content: center;
+        transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+    .mood-option:hover { transform: translateY(-2px); }
+    .mood-option.selected { border-color: var(--accent-color); background: var(--accent-light); box-shadow: 0 0 0 3px var(--accent-light); }
+    .today-grid { display: grid; grid-template-columns: 1fr; gap: 28px; padding: 34px; }
+    @media (min-width: 760px) { .today-grid { grid-template-columns: 1fr 1fr; } }
+    .journal-preview-item {
+        padding: 16px 18px;
+        border-radius: var(--radius-sm);
+        background: var(--bg-card);
+        border: 1px solid var(--glass-border);
+        margin-bottom: 12px;
+    }
+    .journal-preview-item .jp-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+    .journal-preview-item .jp-head strong { font-size: 0.98rem; }
+    .journal-preview-item .jp-head span.jp-date { font-size: 0.78rem; color: var(--text-faint); white-space: nowrap; }
+    .journal-preview-item p { margin: 0; font-size: 0.9rem; color: var(--text-muted); }
+    .journal-empty { font-size: 0.92rem; color: var(--text-muted); }
+    .pillar-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; font-weight: 700; color: var(--accent-color); font-size: 0.9rem; }
+    .pillar-link:hover { color: var(--accent-hover); }
+    .pillar-icon { font-size: 1.8rem; margin-bottom: 10px; display: block; }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; }
+</style>
+</head>
+<body>
+<div id="site-header"></div>
+
+<section class="bm-hero">
+    <div class="bm-container">
+        <span class="bm-badge">Инструмент для ежедневной поддержки</span>
+        <h1>Стресс легче держать под контролем,<br>когда вы понимаете, что с вами происходит</h1>
+        <p class="lead">BalanceMind помогает заметить своё состояние раньше, чем оно перерастёт в перегрузку: короткий тест покажет текущий уровень стресса, практики — что делать прямо сейчас, а дневник — как всё меняется со временем.</p>
+        <div class="hero-actions">
+            <a href="selfanalysis.html" class="btn btn-primary">Пройти тест на стресс</a>
+            <a href="practices.html" class="btn btn-secondary">Посмотреть практики</a>
+        </div>
+    </div>
+</section>
+
+<section class="bm-section">
+    <div class="bm-container">
+        <h2>Как это работает</h2>
+        <p style="max-width: 620px;">Три простых опоры — вместо ещё одного приложения, которое требует дисциплины. Пользуйтесь тем, что нужно именно сегодня.</p>
+        <div class="bm-grid bm-grid-3" style="margin-top: 28px;">
+            <div class="bm-card glass-card">
+                <span class="pillar-icon">📊</span>
+                <h3>Тест и дневник</h3>
+                <p>Пройдите тест на уровень стресса за пару минут и фиксируйте настроение в личном дневнике, чтобы видеть закономерности, а не гадать задним числом.</p>
+                <a class="pillar-link" href="selfanalysis.html">Пройти тест →</a>
+            </div>
+            <div class="bm-card glass-card">
+                <span class="pillar-icon">🌬️</span>
+                <h3>Практики и дыхание</h3>
+                <p>Дыхательные техники и короткие упражнения на случай, когда нужно быстро вернуть себе ясность головы — без лишних объяснений, сразу к делу.</p>
+                <a class="pillar-link" href="practices.html">Посмотреть практики →</a>
+            </div>
+            <div class="bm-card glass-card">
+                <span class="pillar-icon">💬</span>
+                <h3>Сообщество</h3>
+                <p>Форум, где можно рассказать о своей ситуации, прочитать чужой опыт и не чувствовать себя единственным, кто с этим сталкивается.</p>
+                <a class="pillar-link" href="community.html">Заглянуть на форум →</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="bm-section" style="padding-top: 0;">
+    <div class="bm-container">
+        <div class="glass-card today-grid">
+            <div>
+                <h2 style="margin-bottom: 6px;">Как вы сегодня?</h2>
+                <p>Отметьте настроение одним нажатием — это займёт секунду и попадёт в вашу личную статистику.</p>
+                <div class="mood-picker" id="mood-picker">
+                    <button class="mood-option" data-mood="😀" title="Отлично" aria-label="Отлично">😀</button>
+                    <button class="mood-option" data-mood="🙂" title="Хорошо" aria-label="Хорошо">🙂</button>
+                    <button class="mood-option" data-mood="😐" title="Нормально" aria-label="Нормально">😐</button>
+                    <button class="mood-option" data-mood="😔" title="Тяжело" aria-label="Тяжело">😔</button>
+                    <button class="mood-option" data-mood="😣" title="Очень тяжело" aria-label="Очень тяжело">😣</button>
+                    <button class="mood-option" data-mood="😴" title="Вымотан(а)" aria-label="Вымотан(а)">😴</button>
+                </div>
+            </div>
+            <div>
+                <h2 style="margin-bottom: 6px;">Последние записи</h2>
+                <div id="journal-preview">
+                    <p class="journal-empty">Загружаем…</p>
+                </div>
+                <a class="pillar-link" href="selfanalysis.html">Открыть дневник и тест →</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<footer class="bm-footer">
+    <div class="bm-footer-inner">
+        <div class="bm-footer-links">
+            <a href="index.html">Главная</a>
+            <a href="selfanalysis.html">Тест и дневник</a>
+            <a href="practices.html">Практики</a>
+            <a href="articles.html">Статьи</a>
+            <a href="community.html">Сообщество</a>
+            <a href="advice.html">Советы</a>
+            <a href="about.html">О проекте</a>
+        </div>
+        <p class="bm-footer-disclaimer">BalanceMind и его ИИ-помощник не заменяют консультацию лицензированного психолога или врача. Если вам тяжело справляться самостоятельно, обратитесь к специалисту — на странице <a href="advice.html" style="color: var(--accent-color); font-weight: 600;">«Советы»</a> есть подсказки, как это сделать.</p>
+    </div>
+</footer>
+
+<script src="/assets/site.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    initMoodPicker();
+    loadJournalPreview();
+});
+
+async function initMoodPicker() {
+    const picker = document.getElementById('mood-picker');
+    if (!picker) return;
+    const buttons = Array.from(picker.querySelectorAll('.mood-option'));
+
+    function highlight(mood) {
+        buttons.forEach((btn) => btn.classList.toggle('selected', btn.dataset.mood === mood));
+    }
+
+    try {
+        const currentMood = await window.BM.PersonalData.getMood();
+        if (currentMood) highlight(currentMood);
+    } catch (err) {
+        console.error('Не удалось загрузить настроение дня', err);
+    }
+
+    buttons.forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const mood = btn.dataset.mood;
+            highlight(mood);
+            try {
+                await window.BM.PersonalData.setMood(mood);
+                window.BM.Toast.show('Настроение сохранено');
+            } catch (err) {
+                console.error('Не удалось сохранить настроение', err);
+                window.BM.Toast.show('Не получилось сохранить настроение', 'error');
+            }
+        });
+    });
+}
+
+async function loadJournalPreview() {
+    const container = document.getElementById('journal-preview');
+    if (!container) return;
+
+    try {
+        const entries = await window.BM.PersonalData.getJournal();
+        const list = Array.isArray(entries) ? entries.slice(-2).reverse() : [];
+
+        if (list.length === 0) {
+            container.innerHTML = '<p class="journal-empty">Пока нет ни одной записи. Первая заметка в дневнике — хороший повод начать замечать, что на вас влияет.</p>';
+            return;
+        }
+
+        container.innerHTML = '';
+        list.forEach((entry) => {
+            const item = document.createElement('div');
+            item.className = 'journal-preview-item';
+
+            const head = document.createElement('div');
+            head.className = 'jp-head';
+
+            const strong = document.createElement('strong');
+            strong.textContent = `${entry.mood ? entry.mood + ' ' : ''}${entry.title || 'Без названия'}`;
+
+            const dateSpan = document.createElement('span');
+            dateSpan.className = 'jp-date';
+            dateSpan.textContent = entry.date || '';
+
+            head.appendChild(strong);
+            head.appendChild(dateSpan);
+
+            const note = document.createElement('p');
+            note.textContent = entry.note || '';
+
+            item.appendChild(head);
+            item.appendChild(note);
+            container.appendChild(item);
+        });
+    } catch (err) {
+        console.error('Не удалось загрузить дневник', err);
+        container.innerHTML = '<p class="journal-empty">Не получилось загрузить записи дневника. Попробуйте открыть дневник напрямую.</p>';
+    }
+}
+</script>
+</body>
+</html>

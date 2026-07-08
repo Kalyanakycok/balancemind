@@ -1,0 +1,25 @@
+{
+  "name": "BalanceMind — сервис самодиагностики",
+  "short_name": "BalanceMind",
+  "description": "Оцените уровень стресса, тревоги и настроения, ведите дневник и получайте поддержку в спокойном современном интерфейсе.",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fdf6f0",
+  "theme_color": "#ff7a59",
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
