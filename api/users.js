@@ -18,9 +18,13 @@ module.exports = async (req, res) => {
             res.status(403).json({ error: 'Только администратор может менять роли' });
             return;
         }
-        const { username, role } = req.body || {};
+        const { username, role, label } = req.body || {};
         if (!username || (role !== 'admin' && role !== 'user')) {
             res.status(400).json({ error: 'username и role (admin|user) обязательны' });
+            return;
+        }
+        if (label !== undefined && (typeof label !== 'string' || label.length > 40)) {
+            res.status(400).json({ error: 'label должен быть строкой до 40 символов' });
             return;
         }
         const wb = await loadWorkbook();
@@ -31,7 +35,9 @@ module.exports = async (req, res) => {
             return;
         }
         target.role = role;
-        target.label = role === 'admin' ? 'Администратор' : 'Пользователь';
+        // Свою подпись можно задать явно (например «Главный администратор»),
+        // иначе — обычный дефолт по роли.
+        target.label = label ? label.trim() : (role === 'admin' ? 'Администратор' : 'Пользователь');
         setUsers(wb, users);
         await saveWorkbook(wb);
         res.status(200).json(publicUser(target));

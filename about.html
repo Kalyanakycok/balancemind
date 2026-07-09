@@ -187,7 +187,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             name.textContent = u.username;
             const roleSpan = document.createElement('span');
             roleSpan.style.cssText = 'margin-left:8px;color:var(--text-muted);font-size:0.82rem;';
-            roleSpan.textContent = u.role === 'admin' ? 'администратор' : 'пользователь';
+            roleSpan.textContent = u.label || (u.role === 'admin' ? 'администратор' : 'пользователь');
             left.append(name, roleSpan);
 
             const actions = document.createElement('div');
@@ -213,6 +213,30 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } catch (err) {
                     BM.Toast.show(err.message, 'error');
                     roleBtn.disabled = false;
+                }
+            });
+
+            const labelBtn = document.createElement('button');
+            labelBtn.className = 'btn-ghost';
+            labelBtn.style.cssText = 'padding:6px 12px;font-size:0.85rem;';
+            labelBtn.textContent = 'Изменить подпись';
+            labelBtn.addEventListener('click', async () => {
+                const newLabel = prompt(`Подпись для «${u.username}» (например «Главный администратор»):`, u.label || '');
+                if (newLabel === null || !newLabel.trim()) return;
+                labelBtn.disabled = true;
+                try {
+                    const res2 = await BM.Auth.authFetch('/api/users', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: u.username, role: u.role, label: newLabel.trim() })
+                    });
+                    const data = await res2.json();
+                    if (!res2.ok) throw new Error(data.error || 'Не удалось изменить подпись.');
+                    BM.Toast.show('Подпись обновлена');
+                    renderUsers();
+                } catch (err) {
+                    BM.Toast.show(err.message, 'error');
+                    labelBtn.disabled = false;
                 }
             });
 
@@ -260,7 +284,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             });
 
-            actions.append(roleBtn, resetBtn, delBtn);
+            actions.append(roleBtn, labelBtn, resetBtn, delBtn);
             top.append(left, actions);
             card.appendChild(top);
 
