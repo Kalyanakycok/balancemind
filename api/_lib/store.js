@@ -20,6 +20,7 @@ const MOOD_SHEET = 'MoodLogs';
 const PLAN_SHEET = 'DailyPlans';
 const TEST_RESULTS_SHEET = 'TestResults';
 const NOTIF_READ_SHEET = 'NotifRead';
+const MESSAGES_SHEET = 'Messages';
 const USER_COLUMNS = ['username', 'password', 'role', 'label', 'builtIn'];
 const APPEAL_COLUMNS = ['id', 'from', 'subject', 'message', 'date'];
 const FORUM_POST_COLUMNS = ['id', 'author', 'title', 'message', 'date'];
@@ -31,6 +32,7 @@ const MOOD_COLUMNS = ['username', 'mood'];
 const PLAN_COLUMNS = ['username', 'state'];
 const TEST_RESULTS_COLUMNS = ['id', 'username', 'testId', 'score', 'status', 'date', 'timestamp'];
 const NOTIF_READ_COLUMNS = ['username', 'notifId'];
+const MESSAGE_COLUMNS = ['id', 'username', 'channel', 'sender', 'author', 'text', 'date'];
 
 function ensureSheet(wb, name, columns) {
     let ws = wb.getWorksheet(name);
@@ -91,6 +93,7 @@ async function loadWorkbook() {
     ensureSheet(wb, PLAN_SHEET, PLAN_COLUMNS);
     ensureSheet(wb, TEST_RESULTS_SHEET, TEST_RESULTS_COLUMNS);
     ensureSheet(wb, NOTIF_READ_SHEET, NOTIF_READ_COLUMNS);
+    ensureSheet(wb, MESSAGES_SHEET, MESSAGE_COLUMNS);
 
     if (!existingUrl) {
         // ВНИМАНИЕ: дефолтные пароли только для первого входа на свежей базе.
@@ -340,8 +343,40 @@ async function adminDeleteUser(username) {
     replaceSheet(wb, PLAN_SHEET, PLAN_COLUMNS, readRows(wb.getWorksheet(PLAN_SHEET), PLAN_COLUMNS).filter((r) => r.username !== username));
     replaceSheet(wb, TEST_RESULTS_SHEET, TEST_RESULTS_COLUMNS, readRows(wb.getWorksheet(TEST_RESULTS_SHEET), TEST_RESULTS_COLUMNS).filter((r) => r.username !== username));
     replaceSheet(wb, NOTIF_READ_SHEET, NOTIF_READ_COLUMNS, readRows(wb.getWorksheet(NOTIF_READ_SHEET), NOTIF_READ_COLUMNS).filter((r) => r.username !== username));
+    replaceSheet(wb, MESSAGES_SHEET, MESSAGE_COLUMNS, readRows(wb.getWorksheet(MESSAGES_SHEET), MESSAGE_COLUMNS).filter((r) => r.username !== username));
     await saveWorkbook(wb);
     return true;
+}
+
+// ---------- переписка с персоналом (администратор / психолог) ----------
+
+async function getThreadMessages(username, channel) {
+    const wb = await loadWorkbook();
+    return readRows(wb.getWorksheet(MESSAGES_SHEET), MESSAGE_COLUMNS).filter((m) => m.username === username && m.channel === channel);
+}
+async function addMessage(username, channel, sender, author, text, date) {
+    const wb = await loadWorkbook();
+    const rows = readRows(wb.getWorksheet(MESSAGES_SHEET), MESSAGE_COLUMNS);
+    const id = String(Date.now()) + Math.floor(Math.random() * 1000);
+    const row = { id, username, channel, sender, author: author || '', text: text || '', date: date || '' };
+    rows.push(row);
+    replaceSheet(wb, MESSAGES_SHEET, MESSAGE_COLUMNS, rows);
+    await saveWorkbook(wb);
+    return row;
+}
+async function getStaffThreads(channel) {
+    const wb = await loadWorkbook();
+    const rows = readRows(wb.getWorksheet(MESSAGES_SHEET), MESSAGE_COLUMNS).filter((m) => m.channel === channel);
+    const byUser = {};
+    rows.forEach((m) => {
+        if (!byUser[m.username]) byUser[m.username] = [];
+        byUser[m.username].push(m);
+    });
+    return Object.keys(byUser).map((username) => {
+        const list = byUser[username];
+        const last = list[list.length - 1];
+        return { username, lastText: last.text, lastDate: last.date, lastSender: last.sender, total: list.length };
+    });
 }
 
 module.exports = {
@@ -359,5 +394,6 @@ module.exports = {
     getDailyPlan, setDailyPlan,
     getTestResults, saveTestResult,
     getNotifRead, setNotifRead,
-    adminGetUsersOverview, adminSetPassword, adminDeleteUser
+    adminGetUsersOverview, adminSetPassword, adminDeleteUser,
+    getThreadMessages, addMessage, getStaffThreads
 };

@@ -114,3 +114,24 @@ CREATE TABLE IF NOT EXISTS notif_read (
     notif_id    TEXT NOT NULL,
     PRIMARY KEY (username, notif_id)
 );
+
+-- ---------------------------------------------------------------------
+-- Личная переписка пользователя с персоналом (администратор / психолог).
+-- В отличие от ИИ-ассистента (api/assistant-chat.js, без хранения) это
+-- полноценный двусторонний диалог: пользователь пишет, персонал отвечает,
+-- история сохраняется. Тред определяется парой (username, channel), где
+-- channel — 'admin' или 'psychologist'. sender — 'user' или 'staff'.
+-- ---------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS messages (
+    id          TEXT PRIMARY KEY,
+    username    TEXT NOT NULL REFERENCES users(username) ON DELETE CASCADE,
+    channel     TEXT NOT NULL DEFAULT 'admin',    -- 'admin' | 'psychologist'
+    sender      TEXT NOT NULL DEFAULT 'user',     -- 'user' | 'staff'
+    author      TEXT NOT NULL DEFAULT '',         -- отображаемое имя отправителя
+    text        TEXT NOT NULL DEFAULT '',
+    date        TEXT NOT NULL DEFAULT '',
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages(username, channel, created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_channel ON messages(channel, created_at);

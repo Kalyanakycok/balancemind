@@ -136,6 +136,19 @@ async function ensureSchema() {
             notif_id    TEXT NOT NULL,
             PRIMARY KEY (username, notif_id)
         );
+
+        CREATE TABLE IF NOT EXISTS messages (
+            id          TEXT PRIMARY KEY,
+            username    TEXT NOT NULL REFERENCES users(username) ON DELETE CASCADE,
+            channel     TEXT NOT NULL DEFAULT 'admin',
+            sender      TEXT NOT NULL DEFAULT 'user',
+            author      TEXT NOT NULL DEFAULT '',
+            text        TEXT NOT NULL DEFAULT '',
+            date        TEXT NOT NULL DEFAULT '',
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages(username, channel, created_at);
+        CREATE INDEX IF NOT EXISTS idx_messages_channel ON messages(channel, created_at);
     `);
     schemaEnsured = true;
 }
@@ -486,9 +499,47 @@ async function adminDeleteUser(username) {
     await ensureSchema();
     const client = getPool();
     // ON DELETE CASCADE на внешних ключах чистит sessions/journal_entries/
-    // checklist_items/mood_logs/daily_plans/test_results/notif_read сам.
+    // checklist_items/mood_logs/daily_plans/test_results/notif_read/messages сам.
     const res = await client.query('DELETE FROM users WHERE username = $1', [username]);
     return res.rowCount > 0;
+}
+
+// ---------- переписка с персоналом (администратор / психолог) ----------
+
+async function getThreadMessages(username, channel) {
+    await ensureSchema();
+    const res = await getPool().query(
+        'SELECT id, username, channel, sender, author, text, date FROM messages WHERE username = $1 AND channel = $2 ORDER BY created_at',
+        [username, channel]
+    );
+    return res.rows;
+}
+async function addMessage(username, channel, sender, author, text, date) {
+    await ensureSchema();
+    const id = String(Date.now()) + Math.floor(Math.random() * 1000);
+    await getPool().query(
+        'INSERT INTO messages (id, username, channel, sender, author, text, date) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+        [id, username, channel, sender, author || '', text || '', date || '']
+    );
+    return { id, username, channel, sender, author: author || '', text: text || '', date: date || '' };
+}
+// Список тредов для персонала: по одному на пользователя, писавшего в канал,
+// с последним сообщением и числом непрочитанных (от пользователя без ответа).
+async function getStaffThreads(channel) {
+    await ensureSchema();
+    const res = await getPool().query(
+        `SELECT m.username,
+                (SELECT text FROM messages WHERE username = m.username AND channel = m.channel ORDER BY created_at DESC LIMIT 1) AS "lastText",
+                (SELECT date FROM messages WHERE username = m.username AND channel = m.channel ORDER BY created_at DESC LIMIT 1) AS "lastDate",
+                (SELECT sender FROM messages WHERE username = m.username AND channel = m.channel ORDER BY created_at DESC LIMIT 1) AS "lastSender",
+                count(*) AS "total"
+         FROM messages m
+         WHERE m.channel = $1
+         GROUP BY m.username, m.channel
+         ORDER BY max(m.created_at) DESC`,
+        [channel]
+    );
+    return res.rows.map((r) => ({ username: r.username, lastText: r.lastText, lastDate: r.lastDate, lastSender: r.lastSender, total: Number(r.total) }));
 }
 
 module.exports = {
@@ -506,5 +557,6 @@ module.exports = {
     getDailyPlan, setDailyPlan,
     getTestResults, saveTestResult,
     getNotifRead, setNotifRead,
-    adminGetUsersOverview, adminSetPassword, adminDeleteUser
+    adminGetUsersOverview, adminSetPassword, adminDeleteUser,
+    getThreadMessages, addMessage, getStaffThreads
 };

@@ -488,6 +488,26 @@ a.bm-dropdown-item:hover { background: var(--accent-light); }
 .bm-chat-head strong { font-family: var(--font-display); font-size: 0.95rem; }
 .bm-chat-head span { font-size: 0.75rem; color: var(--text-muted); }
 
+.bm-chat-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--glass-border);
+}
+.bm-chat-tab {
+    flex: 1;
+    padding: 7px 4px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--glass-border);
+    background: var(--glass-bg);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+.bm-chat-tab.active { background: var(--gradient-brand); color: #fff; border-color: transparent; }
+
 .bm-chat-body {
     flex: 1;
     overflow-y: auto;

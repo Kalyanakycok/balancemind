@@ -108,6 +108,18 @@
     </div>
 </section>
 
+<section class="bm-section" style="padding-top:0; display:none;" id="staff-inbox-section">
+    <div class="bm-container" style="max-width:820px;">
+        <div class="glass-card" style="padding:26px;">
+            <h3 id="staff-inbox-title">Входящие сообщения</h3>
+            <p style="margin-top:-6px;">Обращения пользователей из чата. Выберите диалог, чтобы ответить.</p>
+            <div id="staff-inbox-tabs" style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;"></div>
+            <div id="staff-threads-list"></div>
+            <div id="staff-thread-view" style="display:none; margin-top:16px;"></div>
+        </div>
+    </div>
+</section>
+
 <section class="bm-section" style="padding-top:0; display:none;" id="admin-panel-section">
     <div class="bm-container" style="max-width:820px;">
         <div class="glass-card" style="padding:26px;">
@@ -160,6 +172,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    // Входящие сообщения — для персонала (администратор и психолог).
+    const isStaff = state.role === 'admin' || state.role === 'psychologist';
+    if (isStaff) {
+        document.getElementById('staff-inbox-section').style.display = 'block';
+        setupStaffInbox(state.role);
+    }
+
     if (state.role !== 'admin') return;
     document.getElementById('admin-panel-section').style.display = 'block';
 
@@ -185,13 +204,26 @@ document.addEventListener('DOMContentLoaded', async () => {
             const left = document.createElement('div');
             const name = document.createElement('strong');
             name.textContent = u.username;
+            const roleFallback = { admin: 'администратор', psychologist: 'психолог', user: 'пользователь' };
             const roleSpan = document.createElement('span');
             roleSpan.style.cssText = 'margin-left:8px;color:var(--text-muted);font-size:0.82rem;';
-            roleSpan.textContent = u.label || (u.role === 'admin' ? 'администратор' : 'пользователь');
+            roleSpan.textContent = u.label || roleFallback[u.role] || 'пользователь';
             left.append(name, roleSpan);
 
             const actions = document.createElement('div');
             actions.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
+
+            async function changeRole(newRole, okMsg) {
+                const res2 = await BM.Auth.authFetch('/api/users', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: u.username, role: newRole })
+                });
+                const data = await res2.json();
+                if (!res2.ok) throw new Error(data.error || 'Не удалось изменить роль.');
+                BM.Toast.show(okMsg);
+                renderUsers();
+            }
 
             const roleBtn = document.createElement('button');
             roleBtn.className = u.role === 'admin' ? 'btn-ghost' : 'btn btn-secondary';
@@ -200,19 +232,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             roleBtn.addEventListener('click', async () => {
                 roleBtn.disabled = true;
                 try {
-                    const newRole = u.role === 'admin' ? 'user' : 'admin';
-                    const res2 = await BM.Auth.authFetch('/api/users', {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username: u.username, role: newRole })
-                    });
-                    const data = await res2.json();
-                    if (!res2.ok) throw new Error(data.error || 'Не удалось изменить роль.');
-                    BM.Toast.show('Роль обновлена');
-                    renderUsers();
+                    await changeRole(u.role === 'admin' ? 'user' : 'admin', 'Роль обновлена');
                 } catch (err) {
                     BM.Toast.show(err.message, 'error');
                     roleBtn.disabled = false;
+                }
+            });
+
+            const psychBtn = document.createElement('button');
+            psychBtn.className = u.role === 'psychologist' ? 'btn-ghost' : 'btn btn-secondary';
+            psychBtn.style.cssText = 'padding:6px 12px;font-size:0.85rem;';
+            psychBtn.textContent = u.role === 'psychologist' ? 'Снять роль психолога' : 'Сделать психологом';
+            psychBtn.addEventListener('click', async () => {
+                psychBtn.disabled = true;
+                try {
+                    await changeRole(u.role === 'psychologist' ? 'user' : 'psychologist', 'Роль обновлена');
+                } catch (err) {
+                    BM.Toast.show(err.message, 'error');
+                    psychBtn.disabled = false;
                 }
             });
 
@@ -284,7 +321,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             });
 
-            actions.append(roleBtn, labelBtn, resetBtn, delBtn);
+            actions.append(roleBtn, psychBtn, labelBtn, resetBtn, delBtn);
             top.append(left, actions);
             card.appendChild(top);
 
@@ -324,6 +361,127 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
     renderUsers();
+
+    // --- Входящие сообщения для персонала (администратор / психолог) ---
+    function setupStaffInbox(role) {
+        // Админ обслуживает оба канала, психолог — только свой.
+        const channels = role === 'admin'
+            ? [{ id: 'admin', label: 'Как администратор' }, { id: 'psychologist', label: 'Как психолог' }]
+            : [{ id: 'psychologist', label: 'Обращения к психологу' }];
+        let activeChannel = channels[0].id;
+        let openUser = null;
+
+        const tabsEl = document.getElementById('staff-inbox-tabs');
+        const threadsEl = document.getElementById('staff-threads-list');
+        const viewEl = document.getElementById('staff-thread-view');
+
+        if (channels.length > 1) {
+            channels.forEach((c) => {
+                const btn = document.createElement('button');
+                btn.className = c.id === activeChannel ? 'btn btn-secondary' : 'btn-ghost';
+                btn.style.cssText = 'padding:6px 14px;font-size:0.85rem;';
+                btn.textContent = c.label;
+                btn.addEventListener('click', () => {
+                    activeChannel = c.id; openUser = null;
+                    tabsEl.querySelectorAll('button').forEach((b, i) => b.className = channels[i].id === activeChannel ? 'btn btn-secondary' : 'btn-ghost');
+                    renderThreads();
+                });
+                tabsEl.appendChild(btn);
+            });
+        }
+
+        async function renderThreads() {
+            viewEl.style.display = 'none';
+            threadsEl.style.display = 'block';
+            threadsEl.innerHTML = '<p style="color:var(--text-muted);">Загрузка…</p>';
+            try {
+                const res = await BM.Auth.authFetch(`/api/messages?action=inbox&channel=${activeChannel}`);
+                const threads = res.ok ? await res.json() : [];
+                threadsEl.innerHTML = '';
+                if (!threads.length) {
+                    threadsEl.innerHTML = '<p style="color:var(--text-muted);">Пока нет обращений в этом канале.</p>';
+                    return;
+                }
+                threads.forEach((t) => {
+                    const row = document.createElement('button');
+                    row.style.cssText = 'display:block;width:100%;text-align:left;padding:12px 14px;margin-bottom:8px;border-radius:var(--radius-sm);background:var(--bg-elevated);border:1px solid var(--glass-border);color:var(--text-main);';
+                    const unread = t.lastSender === 'user';
+                    row.innerHTML = `<strong>${BM.Escape.html(t.username)}</strong>${unread ? ' <span style="color:var(--accent-3);font-size:0.75rem;">● ждёт ответа</span>' : ''}<br><span style="color:var(--text-muted);font-size:0.82rem;">${BM.Escape.html((t.lastText || '').slice(0, 60))}</span>`;
+                    row.addEventListener('click', () => { openUser = t.username; renderThread(); });
+                    threadsEl.appendChild(row);
+                });
+            } catch {
+                threadsEl.innerHTML = '<p style="color:#ff8fb8;">Не удалось загрузить обращения.</p>';
+            }
+        }
+
+        async function renderThread() {
+            threadsEl.style.display = 'none';
+            viewEl.style.display = 'block';
+            viewEl.innerHTML = '<p style="color:var(--text-muted);">Загрузка…</p>';
+            try {
+                const res = await BM.Auth.authFetch(`/api/messages?action=thread&channel=${activeChannel}&user=${encodeURIComponent(openUser)}`);
+                const msgs = res.ok ? await res.json() : [];
+                viewEl.innerHTML = '';
+                const back = document.createElement('button');
+                back.className = 'btn-ghost';
+                back.style.cssText = 'padding:6px 10px;font-size:0.85rem;margin-bottom:10px;';
+                back.textContent = '← К списку';
+                back.addEventListener('click', renderThreads);
+                viewEl.appendChild(back);
+
+                const title = document.createElement('div');
+                title.style.cssText = 'font-weight:700;margin-bottom:10px;';
+                title.textContent = 'Диалог с ' + openUser;
+                viewEl.appendChild(title);
+
+                const thread = document.createElement('div');
+                thread.style.cssText = 'display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;margin-bottom:12px;';
+                msgs.forEach((m) => {
+                    const bubble = document.createElement('div');
+                    const fromStaff = m.sender === 'staff';
+                    bubble.style.cssText = `max-width:80%;padding:9px 13px;border-radius:14px;font-size:0.88rem;${fromStaff ? 'align-self:flex-end;background:var(--gradient-brand);color:#fff;' : 'align-self:flex-start;background:var(--bg-card);border:1px solid var(--glass-border);'}`;
+                    bubble.textContent = (fromStaff ? '' : m.author + ': ') + m.text;
+                    thread.appendChild(bubble);
+                });
+                viewEl.appendChild(thread);
+
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;gap:8px;';
+                const ta = document.createElement('textarea');
+                ta.className = 'bm-textarea';
+                ta.placeholder = 'Ваш ответ…';
+                ta.style.minHeight = '48px';
+                const sendBtn = document.createElement('button');
+                sendBtn.className = 'btn btn-primary';
+                sendBtn.textContent = 'Ответить';
+                sendBtn.addEventListener('click', async () => {
+                    const text = ta.value.trim();
+                    if (!text || sendBtn.disabled) return;
+                    sendBtn.disabled = true;
+                    try {
+                        const r = await BM.Auth.authFetch(`/api/messages?action=reply&channel=${activeChannel}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ user: openUser, text })
+                        });
+                        if (!r.ok) throw new Error((await r.json()).error || 'Не удалось отправить.');
+                        ta.value = '';
+                        renderThread();
+                    } catch (err) {
+                        BM.Toast.show(err.message, 'error');
+                        sendBtn.disabled = false;
+                    }
+                });
+                row.append(ta, sendBtn);
+                viewEl.appendChild(row);
+            } catch {
+                viewEl.innerHTML = '<p style="color:#ff8fb8;">Не удалось загрузить диалог.</p>';
+            }
+        }
+
+        renderThreads();
+    }
 });
 </script>
 </body>

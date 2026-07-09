@@ -609,29 +609,41 @@
     };
 
     // ---------------------------------------------------------------
-    // ChatWidget — плавающий ИИ-ассистент на Claude API
+    // ChatWidget — плавающий чат с тремя каналами:
+    //   assistant     — ИИ-ассистент на Claude API (без хранения, sessionStorage)
+    //   admin         — живая переписка с администратором (/api/messages)
+    //   psychologist  — живая переписка с психологом (/api/messages)
     // ---------------------------------------------------------------
+    const CHAT_CHANNELS = [
+        { id: 'assistant', tab: '🤖 Ассистент', title: 'ИИ-ассистент', sub: 'отвечает сразу, по вопросам стресса', placeholder: 'Спросите про стресс, тревогу, практики…' },
+        { id: 'admin', tab: '🛡️ Админ', title: 'Администратор', sub: 'ответит, когда будет на связи', placeholder: 'Напишите администратору…' },
+        { id: 'psychologist', tab: '🧠 Психолог', title: 'Психолог', sub: 'ответит, когда будет на связи', placeholder: 'Напишите психологу…' }
+    ];
+
     const ChatWidget = {
-        _history: [],
+        _assistantHistory: [],
+        _active: 'assistant',
         mount() {
             const launcher = document.createElement('button');
             launcher.id = 'bm-chat-launcher';
             launcher.type = 'button';
-            launcher.setAttribute('aria-label', 'Открыть ИИ-ассистента');
+            launcher.setAttribute('aria-label', 'Открыть чат');
             launcher.textContent = '💬';
             document.body.appendChild(launcher);
 
             const panel = document.createElement('div');
             panel.id = 'bm-chat-panel';
             panel.className = 'glass-card';
+            const tabsHtml = CHAT_CHANNELS.map((c) =>
+                `<button class="bm-chat-tab${c.id === 'assistant' ? ' active' : ''}" data-channel="${c.id}" type="button">${c.tab}</button>`
+            ).join('');
             panel.innerHTML = `
                 <div class="bm-chat-head">
-                    <div><strong>Ассистент BalanceMind</strong><br><span>на связи по вопросам стресса</span></div>
+                    <div><strong id="bm-chat-title">ИИ-ассистент</strong><br><span id="bm-chat-sub">отвечает сразу, по вопросам стресса</span></div>
                     <button class="btn-ghost" id="bm-chat-close" type="button" style="padding:4px 8px;">✕</button>
                 </div>
-                <div class="bm-chat-body" id="bm-chat-body">
-                    <div class="bm-chat-msg system-note">Я не заменяю специалиста. При тревожных или кризисных состояниях — раздел «Советы → Обращение к специалисту».</div>
-                </div>
+                <div class="bm-chat-tabs">${tabsHtml}</div>
+                <div class="bm-chat-body" id="bm-chat-body"></div>
                 <div class="bm-chat-input-row">
                     <textarea id="bm-chat-input" rows="1" placeholder="Спросите про стресс, тревогу, практики…"></textarea>
                     <button class="bm-chat-send" id="bm-chat-send" type="button" aria-label="Отправить">➤</button>
@@ -642,6 +654,10 @@
             launcher.addEventListener('click', toggle);
             document.getElementById('bm-chat-close').addEventListener('click', toggle);
 
+            panel.querySelectorAll('.bm-chat-tab').forEach((tab) => {
+                tab.addEventListener('click', () => this.switchChannel(tab.dataset.channel));
+            });
+
             const send = () => this.send();
             document.getElementById('bm-chat-send').addEventListener('click', send);
             document.getElementById('bm-chat-input').addEventListener('keydown', (e) => {
@@ -649,28 +665,86 @@
             });
 
             try {
-                this._history = JSON.parse(sessionStorage.getItem('bm_chat_history') || '[]');
-                this._history.forEach((m) => this._renderMessage(m.role, m.content));
-            } catch { this._history = []; }
+                this._assistantHistory = JSON.parse(sessionStorage.getItem('bm_chat_history') || '[]');
+            } catch { this._assistantHistory = []; }
+
+            document.addEventListener('bm:auth-changed', () => {
+                if (this._active !== 'assistant') this.renderChannel();
+            });
+
+            this.renderChannel();
         },
-        _renderMessage(role, content) {
+
+        switchChannel(channel) {
+            this._active = channel;
+            const panel = document.getElementById('bm-chat-panel');
+            panel.querySelectorAll('.bm-chat-tab').forEach((t) => t.classList.toggle('active', t.dataset.channel === channel));
+            const meta = CHAT_CHANNELS.find((c) => c.id === channel);
+            document.getElementById('bm-chat-title').textContent = meta.title;
+            document.getElementById('bm-chat-sub').textContent = meta.sub;
+            document.getElementById('bm-chat-input').placeholder = meta.placeholder;
+            this.renderChannel();
+        },
+
+        _bubble(role, content) {
             const body = document.getElementById('bm-chat-body');
             const div = document.createElement('div');
             div.className = `bm-chat-msg ${role}`;
             div.textContent = content;
             body.appendChild(div);
             body.scrollTop = body.scrollHeight;
+            return div;
         },
+
+        async renderChannel() {
+            const body = document.getElementById('bm-chat-body');
+            body.innerHTML = '';
+            if (this._active === 'assistant') {
+                this._bubble('system-note', 'Я не заменяю специалиста. При кризисных состояниях — раздел «Советы → Обращение к специалисту».');
+                this._assistantHistory.forEach((m) => this._bubble(m.role === 'user' ? 'user' : 'assistant', m.content));
+                return;
+            }
+            // Каналы с людьми — нужен вход.
+            if (!Auth.isLoggedIn()) {
+                const note = this._bubble('system-note', 'Чтобы написать человеку и получить ответ, войдите в аккаунт.');
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-primary';
+                btn.style.cssText = 'margin:8px auto;display:block;padding:8px 18px;';
+                btn.textContent = 'Войти';
+                btn.addEventListener('click', () => AuthModal.open());
+                body.appendChild(btn);
+                return;
+            }
+            this._bubble('system-note', 'Это личная переписка с ' + (this._active === 'psychologist' ? 'психологом' : 'администратором') + '. Ответ придёт сюда же.');
+            try {
+                const res = await Auth.authFetch(`/api/messages?action=thread&channel=${this._active}`);
+                const msgs = res.ok ? await res.json() : [];
+                if (!msgs.length) {
+                    this._bubble('system-note', 'Пока сообщений нет — напишите первое.');
+                } else {
+                    msgs.forEach((m) => this._bubble(m.sender === 'user' ? 'user' : 'assistant', (m.sender === 'staff' ? `${m.author}: ` : '') + m.text));
+                }
+            } catch {
+                this._bubble('system-note', 'Не удалось загрузить переписку. Попробуйте позже.');
+            }
+        },
+
         async send() {
             if (this._sending) return;
             const input = document.getElementById('bm-chat-input');
             const text = input.value.trim();
             if (!text) return;
+
+            if (this._active === 'assistant') return this._sendAssistant(text, input);
+            return this._sendStaff(text, input);
+        },
+
+        async _sendAssistant(text, input) {
             this._sending = true;
             input.value = '';
-            this._history.push({ role: 'user', content: text });
-            this._renderMessage('user', text);
-            sessionStorage.setItem('bm_chat_history', JSON.stringify(this._history));
+            this._assistantHistory.push({ role: 'user', content: text });
+            this._bubble('user', text);
+            sessionStorage.setItem('bm_chat_history', JSON.stringify(this._assistantHistory));
 
             const body = document.getElementById('bm-chat-body');
             const typing = document.createElement('div');
@@ -683,17 +757,39 @@
                 const res = await fetch('/api/assistant-chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ messages: this._history.slice(-10) })
+                    body: JSON.stringify({ messages: this._assistantHistory.slice(-10) })
                 });
                 const data = await res.json();
                 typing.remove();
                 if (!res.ok) throw new Error(data.error || 'Ассистент временно недоступен.');
-                this._history.push({ role: 'assistant', content: data.reply });
-                sessionStorage.setItem('bm_chat_history', JSON.stringify(this._history));
-                this._renderMessage('assistant', data.reply);
+                this._assistantHistory.push({ role: 'assistant', content: data.reply });
+                sessionStorage.setItem('bm_chat_history', JSON.stringify(this._assistantHistory));
+                this._bubble('assistant', data.reply);
             } catch (err) {
                 typing.remove();
-                this._renderMessage('assistant', err.message || 'Не удалось получить ответ. Попробуйте ещё раз чуть позже.');
+                this._bubble('assistant', err.message || 'Не удалось получить ответ. Попробуйте позже.');
+            } finally {
+                this._sending = false;
+            }
+        },
+
+        async _sendStaff(text, input) {
+            if (!Auth.isLoggedIn()) { AuthModal.open(); return; }
+            this._sending = true;
+            input.value = '';
+            this._bubble('user', text);
+            try {
+                const res = await Auth.authFetch(`/api/messages?action=send&channel=${this._active}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || 'Не удалось отправить сообщение.');
+                }
+            } catch (err) {
+                this._bubble('system-note', err.message || 'Ошибка отправки.');
             } finally {
                 this._sending = false;
             }

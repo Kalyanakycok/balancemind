@@ -19,8 +19,9 @@ module.exports = async (req, res) => {
             return;
         }
         const { username, role, label } = req.body || {};
-        if (!username || (role !== 'admin' && role !== 'user')) {
-            res.status(400).json({ error: 'username и role (admin|user) обязательны' });
+        const allowedRoles = ['admin', 'user', 'psychologist'];
+        if (!username || !allowedRoles.includes(role)) {
+            res.status(400).json({ error: 'username и role (admin|user|psychologist) обязательны' });
             return;
         }
         if (label !== undefined && (typeof label !== 'string' || label.length > 40)) {
@@ -37,7 +38,8 @@ module.exports = async (req, res) => {
         target.role = role;
         // Свою подпись можно задать явно (например «Главный администратор»),
         // иначе — обычный дефолт по роли.
-        target.label = label ? label.trim() : (role === 'admin' ? 'Администратор' : 'Пользователь');
+        const roleLabels = { admin: 'Администратор', psychologist: 'Психолог', user: 'Пользователь' };
+        target.label = label ? label.trim() : (roleLabels[role] || 'Пользователь');
         setUsers(wb, users);
         await saveWorkbook(wb);
         res.status(200).json(publicUser(target));
