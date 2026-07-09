@@ -21,6 +21,7 @@ const PLAN_SHEET = 'DailyPlans';
 const TEST_RESULTS_SHEET = 'TestResults';
 const NOTIF_READ_SHEET = 'NotifRead';
 const MESSAGES_SHEET = 'Messages';
+const RECOVERY_SHEET = 'PasswordRecovery';
 const USER_COLUMNS = ['username', 'password', 'role', 'label', 'builtIn'];
 const APPEAL_COLUMNS = ['id', 'from', 'subject', 'message', 'date'];
 const FORUM_POST_COLUMNS = ['id', 'author', 'title', 'message', 'date'];
@@ -33,6 +34,7 @@ const PLAN_COLUMNS = ['username', 'state'];
 const TEST_RESULTS_COLUMNS = ['id', 'username', 'testId', 'score', 'status', 'date', 'timestamp'];
 const NOTIF_READ_COLUMNS = ['username', 'notifId'];
 const MESSAGE_COLUMNS = ['id', 'username', 'channel', 'sender', 'author', 'text', 'date'];
+const RECOVERY_COLUMNS = ['username', 'wordHash'];
 
 function ensureSheet(wb, name, columns) {
     let ws = wb.getWorksheet(name);
@@ -94,6 +96,7 @@ async function loadWorkbook() {
     ensureSheet(wb, TEST_RESULTS_SHEET, TEST_RESULTS_COLUMNS);
     ensureSheet(wb, NOTIF_READ_SHEET, NOTIF_READ_COLUMNS);
     ensureSheet(wb, MESSAGES_SHEET, MESSAGE_COLUMNS);
+    ensureSheet(wb, RECOVERY_SHEET, RECOVERY_COLUMNS);
 
     if (!existingUrl) {
         // ВНИМАНИЕ: дефолтные пароли только для первого входа на свежей базе.
@@ -379,6 +382,18 @@ async function getStaffThreads(channel) {
     });
 }
 
+async function setRecoveryWord(username, wordHash) {
+    const wb = await loadWorkbook();
+    const others = readRows(wb.getWorksheet(RECOVERY_SHEET), RECOVERY_COLUMNS).filter((r) => r.username !== username);
+    replaceSheet(wb, RECOVERY_SHEET, RECOVERY_COLUMNS, [...others, { username, wordHash }]);
+    await saveWorkbook(wb);
+}
+async function getRecoveryWordHash(username) {
+    const wb = await loadWorkbook();
+    const row = readRows(wb.getWorksheet(RECOVERY_SHEET), RECOVERY_COLUMNS).find((r) => r.username === username);
+    return row ? row.wordHash : null;
+}
+
 module.exports = {
     loadWorkbook, saveWorkbook,
     getUsers, setUsers,
@@ -395,5 +410,6 @@ module.exports = {
     getTestResults, saveTestResult,
     getNotifRead, setNotifRead,
     adminGetUsersOverview, adminSetPassword, adminDeleteUser,
-    getThreadMessages, addMessage, getStaffThreads
+    getThreadMessages, addMessage, getStaffThreads,
+    setRecoveryWord, getRecoveryWordHash
 };

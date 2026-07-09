@@ -2,8 +2,12 @@
 // отдельными serverless-функциями, но бесплатный тариф Vercel ограничивает
 // число функций на деплой (12), а функций в проекте стало больше — поэтому
 // маршрутизируем через ?action=.
-const { loadWorkbook, saveWorkbook, getUsers, setUsers, publicUser, isHashedPassword, hashPassword, verifyPassword, createSession, deleteSession } = require('./_lib/store-select');
+const { loadWorkbook, saveWorkbook, getUsers, setUsers, publicUser, isHashedPassword, hashPassword, verifyPassword, createSession, deleteSession, setRecoveryWord, getRecoveryWordHash } = require('./_lib/store-select');
 const { requireAuth } = require('./_lib/auth');
+
+function normalizeWord(w) {
+    return String(w || '').trim().toLowerCase();
+}
 
 async function handleLogin(req, res) {
     const { username, password } = req.body || {};
@@ -54,8 +58,60 @@ async function handleRegister(req, res) {
     users.push(newUser);
     setUsers(wb, users);
     await saveWorkbook(wb);
+    // Необязательное контрольное слово — сразу задаём, если прислали при регистрации.
+    const { recoveryWord } = req.body || {};
+    if (recoveryWord && normalizeWord(recoveryWord).length >= 3) {
+        await setRecoveryWord(username, await hashPassword(normalizeWord(recoveryWord)));
+    }
     const token = await createSession(newUser.username, newUser.role);
     res.status(200).json({ ...publicUser(newUser), token });
+}
+
+// Задать/сменить контрольное слово — только для своего аккаунта (нужен вход).
+async function handleSetRecovery(req, res) {
+    const session = await requireAuth(req);
+    if (!session) {
+        res.status(401).json({ error: 'Нужно войти в аккаунт' });
+        return;
+    }
+    const { recoveryWord } = req.body || {};
+    const word = normalizeWord(recoveryWord);
+    if (word.length < 3) {
+        res.status(400).json({ error: 'Контрольное слово должно быть не короче 3 символов' });
+        return;
+    }
+    await setRecoveryWord(session.username, await hashPassword(word));
+    res.status(200).json({ ok: true });
+}
+
+// Восстановление ЗАБЫТОГО пароля по контрольному слову — без входа.
+// Проверяем: логин существует, слово задано и совпадает — тогда меняем пароль
+// и на всякий случай сбрасываем активные сессии этого аккаунта.
+async function handleRecoverPassword(req, res) {
+    const { username, recoveryWord, newPassword } = req.body || {};
+    if (!username || !recoveryWord || !newPassword) {
+        res.status(400).json({ error: 'Логин, контрольное слово и новый пароль обязательны' });
+        return;
+    }
+    if (String(newPassword).length < 6) {
+        res.status(400).json({ error: 'Новый пароль должен быть не короче 6 символов' });
+        return;
+    }
+    const wb = await loadWorkbook();
+    const users = getUsers(wb);
+    const found = users.find((u) => u.username === username);
+    const wordHash = found ? await getRecoveryWordHash(username) : null;
+    // Единое сообщение об ошибке, чтобы не раскрывать, что именно не совпало
+    // (существование логина / наличие слова / само слово).
+    const ok = wordHash ? await verifyPassword(normalizeWord(recoveryWord), wordHash) : false;
+    if (!found || !ok) {
+        res.status(401).json({ error: 'Логин или контрольное слово не совпадают. Если слово не задавали — обратитесь к администратору.' });
+        return;
+    }
+    found.password = await hashPassword(String(newPassword));
+    setUsers(wb, users);
+    await saveWorkbook(wb);
+    res.status(200).json({ ok: true });
 }
 
 async function handleLogout(req, res) {
@@ -108,5 +164,7 @@ module.exports = async (req, res) => {
     if (action === 'register') return handleRegister(req, res);
     if (action === 'logout') return handleLogout(req, res);
     if (action === 'change-password') return handleChangePassword(req, res);
+    if (action === 'set-recovery') return handleSetRecovery(req, res);
+    if (action === 'recover-password') return handleRecoverPassword(req, res);
     res.status(400).json({ error: 'Неизвестное действие' });
 };

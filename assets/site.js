@@ -99,11 +99,11 @@
             this.setState(data);
             return data;
         },
-        async register(username, password, role = 'user') {
+        async register(username, password, recoveryWord) {
             const res = await fetch('/api/auth?action=register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password, role })
+                body: JSON.stringify({ username, password, recoveryWord })
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Не удалось зарегистрироваться.');
@@ -127,6 +127,26 @@
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Не удалось сменить пароль.');
+            return data;
+        },
+        async setRecoveryWord(recoveryWord) {
+            const res = await this.authFetch('/api/auth?action=set-recovery', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ recoveryWord })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Не удалось сохранить контрольное слово.');
+            return data;
+        },
+        async recoverPassword(username, recoveryWord, newPassword) {
+            const res = await fetch('/api/auth?action=recover-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, recoveryWord, newPassword })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Не удалось восстановить пароль.');
             return data;
         }
     };
@@ -521,11 +541,18 @@
             const state = Auth.getState();
             if (state && state.token) {
                 const initial = Escape.html((state.label || state.username || '?').trim().charAt(0).toUpperCase());
+                const isStaff = state.role === 'admin' || state.role === 'psychologist';
+                const panelLink = isStaff
+                    ? `<a href="/about.html#staff-inbox-section" class="btn btn-secondary" style="padding:7px 14px;font-size:0.85rem;">⚙️ Панель</a>`
+                    : '';
                 slot.innerHTML = `
-                    <div class="bm-auth-pill">
-                        <span class="avatar">${initial}</span>
-                        <span>${Escape.html(state.username)}</span>
-                        <button class="btn-ghost" id="bm-logout-btn" type="button" style="padding:4px 8px;border-radius:999px;">Выйти</button>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        ${panelLink}
+                        <div class="bm-auth-pill">
+                            <span class="avatar">${initial}</span>
+                            <span>${Escape.html(state.username)}</span>
+                            <button class="btn-ghost" id="bm-logout-btn" type="button" style="padding:4px 8px;border-radius:999px;">Выйти</button>
+                        </div>
                     </div>`;
                 document.getElementById('bm-logout-btn').addEventListener('click', async () => {
                     await Auth.logout();
@@ -554,45 +581,75 @@
                         <strong style="font-family:var(--font-display);">Вход в BalanceMind</strong>
                         <button class="btn-ghost" id="bm-auth-close" type="button" style="padding:4px 8px;">✕</button>
                     </div>
-                    <div style="display:flex;gap:6px;margin-bottom:16px;">
+                    <div style="display:flex;gap:6px;margin-bottom:16px;" id="bm-auth-tabs">
                         <button class="btn btn-secondary" id="bm-tab-login" type="button" style="flex:1;padding:8px;">Войти</button>
                         <button class="btn-ghost" id="bm-tab-register" type="button" style="flex:1;padding:8px;">Регистрация</button>
                     </div>
                     <form id="bm-auth-form" style="display:flex;flex-direction:column;gap:10px;">
                         <input class="bm-input" id="bm-auth-username" placeholder="Логин" autocomplete="username" required>
                         <input class="bm-input" id="bm-auth-password" type="password" placeholder="Пароль" autocomplete="current-password" required>
+                        <input class="bm-input" id="bm-auth-recovery" placeholder="Контрольное слово (для восстановления)" style="display:none;">
                         <div id="bm-auth-error" style="color:#ff8fb8;font-size:0.82rem;min-height:1em;"></div>
                         <button class="btn btn-primary" type="submit">Войти</button>
+                        <button class="btn-ghost" id="bm-auth-forgot" type="button" style="font-size:0.82rem;padding:2px;">Забыли пароль?</button>
                     </form>
                 </div>`;
             document.body.appendChild(wrap);
 
+            const $ = (id) => document.getElementById(id);
             let mode = 'login';
             const setMode = (m) => {
                 mode = m;
-                document.getElementById('bm-tab-login').className = m === 'login' ? 'btn btn-secondary' : 'btn-ghost';
-                document.getElementById('bm-tab-register').className = m === 'register' ? 'btn btn-secondary' : 'btn-ghost';
-                document.querySelector('#bm-auth-form button[type="submit"]').textContent = m === 'login' ? 'Войти' : 'Создать аккаунт';
-                document.getElementById('bm-auth-error').textContent = '';
+                $('bm-tab-login').className = m === 'login' ? 'btn btn-secondary' : 'btn-ghost';
+                $('bm-tab-register').className = m === 'register' ? 'btn btn-secondary' : 'btn-ghost';
+                const submit = document.querySelector('#bm-auth-form button[type="submit"]');
+                const pass = $('bm-auth-password');
+                const recovery = $('bm-auth-recovery');
+                $('bm-auth-error').textContent = '';
+                $('bm-auth-tabs').style.display = m === 'recover' ? 'none' : 'flex';
+                $('bm-auth-forgot').style.display = m === 'login' ? 'block' : 'none';
+                if (m === 'login') {
+                    submit.textContent = 'Войти';
+                    pass.style.display = 'block'; pass.placeholder = 'Пароль'; pass.autocomplete = 'current-password';
+                    recovery.style.display = 'none';
+                } else if (m === 'register') {
+                    submit.textContent = 'Создать аккаунт';
+                    pass.style.display = 'block'; pass.placeholder = 'Пароль'; pass.autocomplete = 'new-password';
+                    recovery.style.display = 'block'; recovery.placeholder = 'Контрольное слово (не обязательно, для восстановления)';
+                } else { // recover
+                    submit.textContent = 'Восстановить пароль';
+                    recovery.style.display = 'block'; recovery.placeholder = 'Контрольное слово';
+                    pass.style.display = 'block'; pass.placeholder = 'Новый пароль'; pass.autocomplete = 'new-password';
+                }
             };
-            document.getElementById('bm-tab-login').addEventListener('click', () => setMode('login'));
-            document.getElementById('bm-tab-register').addEventListener('click', () => setMode('register'));
-            document.getElementById('bm-auth-close').addEventListener('click', () => this.close());
+            $('bm-tab-login').addEventListener('click', () => setMode('login'));
+            $('bm-tab-register').addEventListener('click', () => setMode('register'));
+            $('bm-auth-forgot').addEventListener('click', () => setMode('recover'));
+            $('bm-auth-close').addEventListener('click', () => this.close());
             wrap.addEventListener('click', (e) => { if (e.target === wrap) this.close(); });
 
-            document.getElementById('bm-auth-form').addEventListener('submit', async (e) => {
+            $('bm-auth-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const submitBtn = e.target.querySelector('button[type="submit"]');
                 if (submitBtn.disabled) return;
-                const username = document.getElementById('bm-auth-username').value.trim();
-                const password = document.getElementById('bm-auth-password').value;
-                const errorEl = document.getElementById('bm-auth-error');
+                const username = $('bm-auth-username').value.trim();
+                const password = $('bm-auth-password').value;
+                const recoveryWord = $('bm-auth-recovery').value.trim();
+                const errorEl = $('bm-auth-error');
                 errorEl.textContent = '';
                 submitBtn.disabled = true;
                 try {
-                    if (mode === 'login') await Auth.login(username, password);
-                    else await Auth.register(username, password, 'user');
-                    Toast.show(mode === 'login' ? 'Добро пожаловать!' : 'Аккаунт создан!');
+                    if (mode === 'login') {
+                        await Auth.login(username, password);
+                        Toast.show('Добро пожаловать!');
+                    } else if (mode === 'register') {
+                        await Auth.register(username, password, recoveryWord);
+                        Toast.show('Аккаунт создан!');
+                    } else {
+                        await Auth.recoverPassword(username, recoveryWord, password);
+                        Toast.show('Пароль восстановлен, входим…');
+                        await Auth.login(username, password);
+                    }
                     this.close();
                 } catch (err) {
                     errorEl.textContent = err.message || 'Что-то пошло не так.';
@@ -603,8 +660,15 @@
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape' && wrap.style.display === 'flex') this.close();
             });
+            this._setMode = setMode;
         },
-        open() { this._ensure(); document.getElementById('bm-auth-modal').style.display = 'flex'; },
+        open() {
+            this._ensure();
+            if (this._setMode) this._setMode('login');
+            const f = document.getElementById('bm-auth-form');
+            if (f) f.reset();
+            document.getElementById('bm-auth-modal').style.display = 'flex';
+        },
         close() { const m = document.getElementById('bm-auth-modal'); if (m) m.style.display = 'none'; }
     };
 

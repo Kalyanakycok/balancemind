@@ -135,3 +135,12 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages(username, channel, created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_channel ON messages(channel, created_at);
+
+-- Контрольное слово для самостоятельного восстановления пароля (без почты).
+-- Хранится bcrypt-хешем, как и пароль, — прочитать его нельзя, можно только
+-- проверить при восстановлении. Отдельная таблица, чтобы не трогать логику
+-- сохранения users (persistUsers перезаписывает строки целиком).
+CREATE TABLE IF NOT EXISTS password_recovery (
+    username    TEXT PRIMARY KEY REFERENCES users(username) ON DELETE CASCADE,
+    word_hash   TEXT NOT NULL
+);

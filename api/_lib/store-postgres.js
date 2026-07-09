@@ -149,6 +149,11 @@ async function ensureSchema() {
         );
         CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages(username, channel, created_at);
         CREATE INDEX IF NOT EXISTS idx_messages_channel ON messages(channel, created_at);
+
+        CREATE TABLE IF NOT EXISTS password_recovery (
+            username    TEXT PRIMARY KEY REFERENCES users(username) ON DELETE CASCADE,
+            word_hash   TEXT NOT NULL
+        );
     `);
     schemaEnsured = true;
 }
@@ -542,6 +547,22 @@ async function getStaffThreads(channel) {
     return res.rows.map((r) => ({ username: r.username, lastText: r.lastText, lastDate: r.lastDate, lastSender: r.lastSender, total: Number(r.total) }));
 }
 
+// ---------- контрольное слово для восстановления пароля ----------
+
+async function setRecoveryWord(username, wordHash) {
+    await ensureSchema();
+    await getPool().query(
+        `INSERT INTO password_recovery (username, word_hash) VALUES ($1,$2)
+         ON CONFLICT (username) DO UPDATE SET word_hash = EXCLUDED.word_hash`,
+        [username, wordHash]
+    );
+}
+async function getRecoveryWordHash(username) {
+    await ensureSchema();
+    const res = await getPool().query('SELECT word_hash AS "wordHash" FROM password_recovery WHERE username = $1', [username]);
+    return res.rows[0] ? res.rows[0].wordHash : null;
+}
+
 module.exports = {
     loadWorkbook, saveWorkbook,
     getUsers, setUsers,
@@ -558,5 +579,6 @@ module.exports = {
     getTestResults, saveTestResult,
     getNotifRead, setNotifRead,
     adminGetUsersOverview, adminSetPassword, adminDeleteUser,
-    getThreadMessages, addMessage, getStaffThreads
+    getThreadMessages, addMessage, getStaffThreads,
+    setRecoveryWord, getRecoveryWordHash
 };

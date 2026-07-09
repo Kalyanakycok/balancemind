@@ -98,11 +98,18 @@
     <div class="bm-container" style="max-width:480px;">
         <div class="glass-card" style="padding:26px;">
             <h3>Мой аккаунт</h3>
-            <p style="margin-top:-6px;">Смена пароля требует знания текущего. Если пароль забыт — попросите администратора сбросить его.</p>
+            <p style="margin-top:-6px;">Смена пароля требует знания текущего.</p>
             <form id="change-password-form" style="display:flex; flex-direction:column; gap:10px;">
                 <input class="bm-input" id="cp-current" type="password" placeholder="Текущий пароль" required autocomplete="current-password">
                 <input class="bm-input" id="cp-new" type="password" placeholder="Новый пароль (от 6 символов)" required autocomplete="new-password" minlength="6">
                 <button class="btn btn-secondary" type="submit">Сменить пароль</button>
+            </form>
+
+            <h3 style="margin-top:24px;">Контрольное слово</h3>
+            <p style="margin-top:-6px;">Задайте слово, которое знаете только вы — оно понадобится, чтобы <b>самостоятельно восстановить пароль</b>, если вы его забудете (без него восстановить пароль сможет только администратор).</p>
+            <form id="recovery-word-form" style="display:flex; flex-direction:column; gap:10px;">
+                <input class="bm-input" id="rw-word" placeholder="Контрольное слово (от 3 символов)" required minlength="3">
+                <button class="btn btn-secondary" type="submit">Сохранить контрольное слово</button>
             </form>
         </div>
     </div>
@@ -164,6 +171,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             await BM.Auth.changePassword(currentPassword, newPassword);
             BM.Toast.show('Пароль изменён');
+            e.target.reset();
+        } catch (err) {
+            BM.Toast.show(err.message, 'error');
+        } finally {
+            submitBtn.disabled = false;
+        }
+    });
+
+    document.getElementById('recovery-word-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        if (submitBtn.disabled) return;
+        const word = document.getElementById('rw-word').value.trim();
+        submitBtn.disabled = true;
+        try {
+            await BM.Auth.setRecoveryWord(word);
+            BM.Toast.show('Контрольное слово сохранено');
             e.target.reset();
         } catch (err) {
             BM.Toast.show(err.message, 'error');
