@@ -4,7 +4,7 @@
 // кеширует только статические страницы/ассеты/иконки, чтобы сайт открывался
 // без сети хотя бы для чтения.
 
-const CACHE_NAME = 'balancemind-cache-v3';
+const CACHE_NAME = 'balancemind-cache-v4';
 const CORE_ASSETS = [
     '/',
     '/index.html',
@@ -17,6 +17,7 @@ const CORE_ASSETS = [
     '/manifest.json',
     '/assets/site.css',
     '/assets/site.js',
+    '/assets/tests-data.js',
     '/icons/icon-192.png',
     '/icons/icon-512.png'
 ];

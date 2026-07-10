@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="view-transition" content="same-origin">
-<title>BalanceMind — Тесты на стресс, тревожность, выгорание и дневник</title>
-<meta name="description" content="Тесты на стресс, тревожность, выгорание, самооценку, прокрастинацию и сон — ведите дневник самонаблюдения и отслеживайте динамику.">
+<title>BalanceMind — 30 тестов самопознания и дневник</title>
+<meta name="description" content="30 тестов самонаблюдения — стресс, тревога, сон, самооценка, отношения и другое. Ведите дневник самонаблюдения и отслеживайте динамику.">
 <meta name="theme-color" content="#090b14">
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/icons/icon-192.png">
@@ -34,9 +34,16 @@
     .journal-entry { padding: 18px 20px; margin-bottom: 12px; }
     .journal-entry .meta { display: flex; justify-content: space-between; color: var(--text-muted); font-size: 0.8rem; margin-bottom: 6px; }
     .journal-entry .actions { display: flex; gap: 10px; margin-top: 12px; }
-    .sa-test-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px; }
-    .sa-test-tab { border: 1px solid var(--glass-border); background: var(--glass-bg); color: var(--text-muted); padding: 9px 18px; border-radius: 999px; font-weight: 600; font-size: 0.88rem; }
-    .sa-test-tab.active { background: var(--gradient-brand); color: #fff; border-color: transparent; }
+    .sa-cat-filter { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 26px; }
+    .sa-cat-filter button { border: 1px solid var(--glass-border); background: var(--glass-bg); color: var(--text-muted); padding: 8px 16px; border-radius: 999px; font-weight: 600; font-size: 0.85rem; }
+    .sa-cat-filter button.active { background: var(--gradient-brand); color: #fff; border-color: transparent; }
+    .sa-test-card { padding: 20px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; transition: transform 0.15s ease, box-shadow 0.2s ease; }
+    .sa-test-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-glow); }
+    .sa-test-card .sa-test-icon { font-size: 1.8rem; }
+    .sa-test-card h3 { margin: 0; font-size: 1.05rem; }
+    .sa-test-card p { margin: 0; font-size: 0.85rem; color: var(--text-muted); }
+    .sa-test-card .sa-test-cat { font-size: 0.72rem; color: var(--accent-color); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+    .sa-test-card .sa-test-done { font-size: 0.75rem; color: var(--accent-2); font-weight: 600; margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -44,36 +51,47 @@
 
 <section class="bm-hero" style="padding-bottom:20px;">
     <span class="bm-badge">Самоанализ</span>
-    <h1>Тесты на самочувствие <span class="bm-gradient-text">и личный дневник</span></h1>
-    <p class="lead" id="sa-hero-desc">11 вопросов о том, как вы себя чувствуете в последнее время. Это инструмент самонаблюдения, а не медицинская диагностика — результат помогает заметить динамику, а не поставить диагноз.</p>
+    <h1>30 тестов о себе <span class="bm-gradient-text">и личный дневник</span></h1>
+    <p class="lead">Короткие тесты самонаблюдения по 12 вопросов — от стресса и сна до самооценки и осознанности. Это не диагностика, а способ заметить свою динамику. Выберите тему.</p>
 </section>
 
 <section class="bm-section" style="padding-top:0;">
-    <div class="bm-container" style="max-width:760px;">
-        <div class="sa-test-tabs" id="sa-test-tabs"></div>
-        <form id="quiz-form"></form>
-        <div id="sa-error">Пожалуйста, ответьте на все вопросы.</div>
-        <button class="btn btn-primary" id="sa-submit" type="button" style="width:100%;">Узнать результат</button>
-
-        <div class="glass-card" id="sa-result">
-            <div style="text-align:center;">
-                <div class="sa-score-big bm-gradient-text" id="sa-score">0</div>
-                <div style="color:var(--text-muted);">из 44 баллов</div>
-                <div class="sa-bar-track"><div class="sa-bar-fill" id="sa-bar" style="width:0%;"></div></div>
-                <h3 id="sa-status"></h3>
-                <p id="sa-desc"></p>
-            </div>
-            <ul id="sa-recs" style="color:var(--text-muted); line-height:1.8;"></ul>
-            <button class="btn btn-secondary" id="sa-reset" type="button">Пройти ещё раз</button>
+    <div class="bm-container">
+        <!-- Каталог тестов -->
+        <div id="sa-catalog">
+            <div class="sa-cat-filter" id="sa-cat-filter"></div>
+            <div class="bm-grid bm-grid-3" id="sa-catalog-grid"></div>
         </div>
 
-        <div class="glass-card" style="padding:24px; margin-top:30px;">
-            <h3 id="sa-history-title">История результатов</h3>
-            <div id="sa-history-empty" style="color:var(--text-muted);">Пока нет пройденных тестов.</div>
-            <table class="sa-history-table" id="sa-history-table" style="display:none;">
-                <thead><tr><th>Дата</th><th>Балл</th><th>Уровень</th></tr></thead>
-                <tbody id="sa-history-body"></tbody>
-            </table>
+        <!-- Прохождение выбранного теста -->
+        <div id="sa-test-view" style="display:none; max-width:760px; margin:0 auto;">
+            <button class="btn-ghost" id="sa-back" type="button" style="padding:6px 12px;">← Все тесты</button>
+            <h2 id="sa-test-title" style="margin:12px 0 4px;"></h2>
+            <p id="sa-test-intro" style="color:var(--text-muted); margin-bottom:20px;"></p>
+            <form id="quiz-form"></form>
+            <div id="sa-error">Пожалуйста, ответьте на все вопросы.</div>
+            <button class="btn btn-primary" id="sa-submit" type="button" style="width:100%;">Узнать результат</button>
+
+            <div class="glass-card" id="sa-result">
+                <div style="text-align:center;">
+                    <div class="sa-score-big bm-gradient-text" id="sa-score">0%</div>
+                    <div style="color:var(--text-muted);" id="sa-score-raw"></div>
+                    <div class="sa-bar-track"><div class="sa-bar-fill" id="sa-bar" style="width:0%;"></div></div>
+                    <h3 id="sa-status"></h3>
+                    <p id="sa-desc"></p>
+                </div>
+                <ul id="sa-recs" style="color:var(--text-muted); line-height:1.8;"></ul>
+                <button class="btn btn-secondary" id="sa-reset" type="button">Пройти ещё раз</button>
+            </div>
+
+            <div class="glass-card" style="padding:24px; margin-top:30px;">
+                <h3 id="sa-history-title">История результатов</h3>
+                <div id="sa-history-empty" style="color:var(--text-muted);">Пока нет пройденных тестов.</div>
+                <table class="sa-history-table" id="sa-history-table" style="display:none;">
+                    <thead><tr><th>Дата</th><th>Результат</th><th>Уровень</th></tr></thead>
+                    <tbody id="sa-history-body"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 </section>
@@ -116,205 +134,105 @@
     </div>
 </footer>
 
+<script src="/assets/tests-data.js"></script>
 <script src="/assets/site.js" defer></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    const scales = ['Совсем нет', 'Редко', 'Иногда', 'Часто', 'Почти всегда'];
+    const scales = window.BM_TEST_SCALES || ['Совсем нет', 'Редко', 'Иногда', 'Часто', 'Почти всегда'];
+    const TESTS = window.BM_TESTS || [];
     const moods = BM.MOOD_OPTIONS.map((m) => m.mood);
     const moodLabels = Object.fromEntries(BM.MOOD_OPTIONS.map((m) => [m.mood, m.label]));
 
-    // Три отдельных теста самонаблюдения — одна и та же механика (11 вопросов,
-    // шкала 0-4, максимум 44 балла), разные темы. Результаты хранятся под
-    // разными testId в той же таблице test_results (бэкенд уже это умеет).
-    const TEST_DEFINITIONS = {
-        stress: {
-            label: 'Стресс',
-            heroDesc: '11 вопросов о том, как вы себя чувствуете в последнее время. Это инструмент самонаблюдения, а не медицинская диагностика — результат помогает заметить динамику, а не поставить диагноз.',
-            historyTitle: 'История теста на стресс',
-            questions: [
-                { id: 1, topic: 'Усталость', text: 'Чувствуете ли вы физическое или эмоциональное истощение в конце обычного дня?' },
-                { id: 2, topic: 'Качество сна', text: 'Испытываете ли вы проблемы со сном (трудности засыпания, ночные пробуждения)?' },
-                { id: 3, topic: 'Тревожность', text: 'Ловите ли вы себя на ощущении беспричинной внутренней тревоги или беспокойства?' },
-                { id: 4, topic: 'Раздражительность', text: 'Замечаете ли вы, что мелкие неурядицы вызывают раздражительность?' },
-                { id: 5, topic: 'Концентрация внимания', text: 'Трудно ли вам сфокусироваться на одной сложной задаче без отвлечения?' },
-                { id: 6, topic: 'Настроение', text: 'Бывает ли ваше настроение подавленным или стабильно сниженным?' },
-                { id: 7, topic: 'Ощущение перегрузки', text: 'Ощущаете ли вы, что текущие дела или обязательства давят на вас своей массой?' },
-                { id: 8, topic: 'Мотивация', text: 'Замечаете ли вы упадок интереса к тем делам, которые раньше вдохновляли?' },
-                { id: 9, topic: 'Физическое напряжение', text: 'Чувствуете ли вы мышечное напряжение в теле (шея, плечи, челюсть)?' },
-                { id: 10, topic: 'Способность отдыхать', text: 'Сложно ли вам во время отдыха полностью отключить мысли и расслабиться?' },
-                { id: 11, topic: 'Общее состояние', text: 'В целом, чувствуете ли вы себя эмоционально уязвимым или уставшим от рутины?' }
-            ],
-            scoreToResult(score) {
-                if (score <= 11) return { status: 'Низкий уровень стресса', desc: 'Показатели находятся в пределах нормы. Вы справляетесь с нагрузкой и восстанавливаетесь достаточно хорошо.', recs: ['Поддерживайте привычный режим сна.', 'Сохраняйте короткие паузы между задачами.'] };
-                if (score <= 22) return { status: 'Умеренный уровень стресса', desc: 'Сейчас чувствуется рабочая нагрузка, но вы ещё можете мягко скорректировать ритм.', recs: ['Сделайте перерыв каждые 90 минут.', 'Ограничьте лишний информационный шум вечером.'] };
-                if (score <= 33) return { status: 'Повышенный уровень стресса', desc: 'Нагрузка уже заметно накапливается. Важно бережно распределить задачи и дать себе отдых.', recs: ['Отложите второстепенное на следующий день.', 'Проведите 10 минут на дыхание или прогулке.'] };
-                return { status: 'Высокий уровень стресса', desc: 'Сигналы тела указывают на сильное истощение ресурсов. Не игнорируйте их.', recs: ['Запланируйте полноценный отдых.', 'Если состояние длится долго — обратитесь к специалисту.'] };
-            }
-        },
-        anxiety: {
-            label: 'Тревожность',
-            heroDesc: '11 вопросов о фоновом беспокойстве и тревожных мыслях за последнее время. Помогает заметить рост тревожности раньше, чем она начнёт мешать повседневным делам.',
-            historyTitle: 'История теста на тревожность',
-            questions: [
-                { id: 1, topic: 'Беспокойство', text: 'Ловите ли вы себя на постоянном беспокойстве по мелким поводам?' },
-                { id: 2, topic: 'Телесное напряжение', text: 'Чувствуете ли вы физическое напряжение (сжатые челюсти, поднятые плечи) без явной причины?' },
-                { id: 3, topic: 'Навязчивые мысли', text: 'Трудно ли вам остановить поток тревожных мыслей перед сном?' },
-                { id: 4, topic: 'Избегание', text: 'Стараетесь ли вы избегать ситуаций, которые могут вызвать тревогу?' },
-                { id: 5, topic: 'Катастрофизация', text: 'Часто ли вы представляете худший из возможных исходов событий?' },
-                { id: 6, topic: 'Физические реакции', text: 'Замечаете ли вы учащённое сердцебиение или дыхание в спокойных ситуациях?' },
-                { id: 7, topic: 'Раздражительность от тревоги', text: 'Становитесь ли вы более раздражительными из-за фонового беспокойства?' },
-                { id: 8, topic: 'Потребность в контроле', text: 'Чувствуете ли вы, что должны всё контролировать, чтобы не тревожиться?' },
-                { id: 9, topic: 'Концентрация', text: 'Мешает ли тревога сосредоточиться на текущей задаче?' },
-                { id: 10, topic: 'Социальная тревожность', text: 'Испытываете ли вы сильное беспокойство перед общением с людьми?' },
-                { id: 11, topic: 'Предчувствие плохого', text: 'Возникает ли ощущение, что вот-вот случится что-то плохое, без конкретной причины?' }
-            ],
-            scoreToResult(score) {
-                if (score <= 11) return { status: 'Низкий уровень тревожности', desc: 'Фоновое беспокойство не мешает повседневной жизни — хороший знак.', recs: ['Продолжайте регулярно отслеживать состояние.', 'Дыхательные практики помогут удержать этот уровень.'] };
-                if (score <= 22) return { status: 'Умеренная тревожность', desc: 'Периодами тревога даёт о себе знать, но пока управляема.', recs: ['Попробуйте технику «5-4-3-2-1» из раздела «Практики».', 'Ограничьте новости и соцсети перед сном.'] };
-                if (score <= 33) return { status: 'Повышенная тревожность', desc: 'Тревога заметно влияет на концентрацию и самочувствие в течение дня.', recs: ['Регулярная дыхательная практика 4-7-8 (раздел «Практики»).', 'Обсудите состояние с близким человеком или в сообществе.'] };
-                return { status: 'Высокая тревожность', desc: 'Уровень тревоги существенно мешает повседневной жизни — стоит отнестись к этому серьёзно.', recs: ['Рассмотрите обращение к специалисту (раздел «Советы»).', 'Не оставайтесь с этим состоянием в одиночку — сообщество или близкие могут поддержать.'] };
-            }
-        },
-        burnout: {
-            label: 'Выгорание',
-            heroDesc: '11 вопросов о вовлечённости в работу/учёбу и эмоциональном ресурсе. Помогает заметить выгорание на ранней стадии, когда с ним ещё легко справиться.',
-            historyTitle: 'История теста на выгорание',
-            questions: [
-                { id: 1, topic: 'Эмоциональное истощение', text: 'Чувствуете ли вы, что эмоционально «выжаты» даже после отдыха?' },
-                { id: 2, topic: 'Цинизм', text: 'Замечаете ли вы растущее безразличие или цинизм к работе/учёбе?' },
-                { id: 3, topic: 'Обесценивание результата', text: 'Кажется ли вам, что ваши усилия не имеют смысла или результата?' },
-                { id: 4, topic: 'Потеря вовлечённости', text: 'Пропал ли интерес к делам, которые раньше увлекали?' },
-                { id: 5, topic: 'Отстранённость', text: 'Стараетесь ли вы избегать общения с коллегами или одногруппниками?' },
-                { id: 6, topic: 'Хроническая усталость', text: 'Чувствуете ли вы постоянную усталость, не проходящую после сна?' },
-                { id: 7, topic: 'Раздражительность', text: 'Реагируете ли вы более резко на мелкие рабочие или учебные раздражители?' },
-                { id: 8, topic: 'Снижение продуктивности', text: 'Кажется ли вам, что вы стали хуже справляться с тем, что раньше давалось легко?' },
-                { id: 9, topic: 'Ощущение бессмысленности', text: 'Возникает ли мысль «зачем всё это», глядя на текущие задачи?' },
-                { id: 10, topic: 'Утренний дискомфорт', text: 'Тяжело ли вам заставить себя начать рабочий или учебный день?' },
-                { id: 11, topic: 'Физические симптомы', text: 'Проявляется ли состояние физически — головные боли, напряжение, проблемы с ЖКТ?' }
-            ],
-            scoreToResult(score) {
-                if (score <= 11) return { status: 'Признаков выгорания нет', desc: 'Вовлечённость и энергия в норме.', recs: ['Продолжайте в том же ритме.', 'Не забывайте про регулярные паузы — это профилактика.'] };
-                if (score <= 22) return { status: 'Начальные признаки выгорания', desc: 'Пока это лёгкая усталость от рутины, но стоит обратить внимание.', recs: ['Пересмотрите баланс нагрузки и отдыха на неделю.', 'Дневник поможет заметить, что именно выматывает больше всего.'] };
-                if (score <= 33) return { status: 'Умеренное выгорание', desc: 'Вовлечённость и продуктивность заметно снизились — организм сигнализирует о перегрузке.', recs: ['Сократите необязательные задачи на ближайшую неделю.', 'Поговорите с руководителем/куратором о нагрузке, если это возможно.'] };
-                return { status: 'Выраженное выгорание', desc: 'Состояние существенно влияет на работоспособность и эмоциональное состояние.', recs: ['Рассмотрите обращение к специалисту (раздел «Советы»).', 'Полноценный отдых сейчас важнее, чем доведение текущих задач до конца.'] };
-            }
-        },
-        selfesteem: {
-            label: 'Самооценка',
-            heroDesc: '11 вопросов о том, как вы относитесь к себе. Помогает заметить привычки самокритики, которые незаметно подтачивают уверенность.',
-            historyTitle: 'История теста на самооценку',
-            questions: [
-                { id: 1, topic: 'Сравнение с другими', text: 'Часто ли вы сравниваете себя с другими не в свою пользу?' },
-                { id: 2, topic: 'Комплименты', text: 'Трудно ли вам принять комплимент, не обесценив его?' },
-                { id: 3, topic: 'Ошибки', text: 'Воспринимаете ли вы одну ошибку как доказательство своей несостоятельности?' },
-                { id: 4, topic: 'Мнение окружающих', text: 'Сильно ли на ваше настроение влияет чужое мнение о вас?' },
-                { id: 5, topic: 'Внутренний критик', text: 'Внутренний голос чаще критикует вас, чем поддерживает?' },
-                { id: 6, topic: 'Личные границы', text: 'Трудно ли вам отказывать, боясь показаться «плохим»?' },
-                { id: 7, topic: 'Обесценивание достижений', text: 'Обесцениваете ли вы свои достижения («это ерунда», «любой бы справился»)?' },
-                { id: 8, topic: 'Внешность', text: 'Беспокоит ли вас, как вас воспринимают внешне, сильнее, чем хотелось бы?' },
-                { id: 9, topic: 'Право на ошибку', text: 'Чувствуете ли вы, что должны быть безупречны, чтобы вас уважали?' },
-                { id: 10, topic: 'Зависимость от одобрения', text: 'Зависит ли ваше самоощущение в основном от чужих успехов и одобрения?' },
-                { id: 11, topic: 'Забота о себе', text: 'Откладываете ли вы заботу о себе «на потом», ставя других выше?' }
-            ],
-            scoreToResult(score) {
-                if (score <= 11) return { status: 'Устойчивая самооценка', desc: 'Вы в целом относитесь к себе с уважением и не разрушаете себя критикой.', recs: ['Продолжайте замечать свои реальные достижения.', 'Делитесь этим устойчивым отношением к себе с близкими — оно заразительно.'] };
-                if (score <= 22) return { status: 'Умеренные колебания самооценки', desc: 'Периодами самокритика берёт верх, но в целом вы способны себя поддержать.', recs: ['Записывайте в дневник не только события, но и свои реальные заслуги.', 'Замечайте момент, когда обесцениваете достижение — и останавливайте себя.'] };
-                if (score <= 33) return { status: 'Заниженная самооценка', desc: 'Внутренний критик работает активнее, чем хотелось бы, и это влияет на решения.', recs: ['Практика самосострадания — попробуйте говорить с собой так, как с другом.', 'Обсудите паттерн самокритики в сообществе или с близким человеком.'] };
-                return { status: 'Выраженно заниженная самооценка', desc: 'Самокритика существенно мешает жить и принимать решения в свою пользу.', recs: ['Стоит обсудить это со специалистом (раздел «Советы») — самооценка хорошо поддаётся работе.', 'Начните с малого: одна записанная в дневник реальная заслуга в день.'] };
-            }
-        },
-        procrastination: {
-            label: 'Прокрастинация',
-            heroDesc: '11 вопросов о том, как вы обращаетесь со своими задачами и дедлайнами. Помогает отличить обычную лень от паттерна, который стоит менять.',
-            historyTitle: 'История теста на прокрастинацию',
-            questions: [
-                { id: 1, topic: 'Откладывание', text: 'Откладываете ли вы важные задачи до последнего момента?' },
-                { id: 2, topic: 'Работа под давлением', text: 'Работаете ли вы продуктивно только под давлением дедлайна?' },
-                { id: 3, topic: 'Ложная занятость', text: 'Уходите ли вы в мелкие несрочные дела, избегая главной задачи?' },
-                { id: 4, topic: 'Трудности старта', text: 'Труднее всего вам начать задачу, а не закончить её?' },
-                { id: 5, topic: 'Перфекционизм', text: 'Откладываете ли вы начало, пока не почувствуете себя полностью готовым?' },
-                { id: 6, topic: 'Чувство вины', text: 'Чувствуете ли вы вину или тревогу из-за отложенных дел?' },
-                { id: 7, topic: 'Списки дел', text: 'Переносите ли вы одни и те же пункты из списка дел изо дня в день?' },
-                { id: 8, topic: 'Отвлечения', text: 'Легко ли вас отвлекают телефон и соцсети, когда нужно работать?' },
-                { id: 9, topic: 'Оценка времени', text: 'Недооцениваете ли вы, сколько времени в реальности займёт задача?' },
-                { id: 10, topic: 'Избегание дискомфорта', text: 'Откладываете ли вы задачи, которые вызывают скуку или дискомфорт?' },
-                { id: 11, topic: 'Последствия', text: 'Сталкивались ли вы с реальными неприятными последствиями из-за откладывания?' }
-            ],
-            scoreToResult(score) {
-                if (score <= 11) return { status: 'Прокрастинация не мешает', desc: 'Вы в целом справляетесь с задачами без затяжного откладывания.', recs: ['Сохраняйте текущую систему планирования.', 'Чек-лист в разделе «Практики» поможет удержать этот темп.'] };
-                if (score <= 22) return { status: 'Умеренная прокрастинация', desc: 'Иногда откладывание берёт верх, но это пока не создаёт серьёзных проблем.', recs: ['Попробуйте технику «первые 5 минут» — начните задачу без цели её закончить.', 'Разбивайте крупные задачи на маленькие шаги в плане дня.'] };
-                if (score <= 33) return { status: 'Заметная прокрастинация', desc: 'Откладывание регулярно создаёт стресс и давление дедлайнов.', recs: ['Уберите отвлекающие приложения на время фокус-сессий.', 'Дневник поможет заметить, каких именно задач вы избегаете и почему.'] };
-                return { status: 'Выраженная прокрастинация', desc: 'Паттерн откладывания заметно влияет на результаты и самочувствие.', recs: ['Если за этим стоит тревога или перфекционизм — обсудите это со специалистом.', 'Начните с одной маленькой задачи сегодня, без попытки исправить всё сразу.'] };
-            }
-        },
-        sleep: {
-            label: 'Качество сна',
-            heroDesc: '11 вопросов о том, как вы спите в последнее время. Сон — один из главных факторов, влияющих на стресс и настроение.',
-            historyTitle: 'История теста на качество сна',
-            questions: [
-                { id: 1, topic: 'Засыпание', text: 'Трудно ли вам заснуть в течение 20-30 минут после того, как легли?' },
-                { id: 2, topic: 'Ночные пробуждения', text: 'Просыпаетесь ли вы среди ночи, и потом трудно заснуть снова?' },
-                { id: 3, topic: 'Режим сна', text: 'Ложитесь ли вы спать и встаёте в сильно разное время изо дня в день?' },
-                { id: 4, topic: 'Экраны перед сном', text: 'Пользуетесь ли вы телефоном или компьютером в постели перед сном?' },
-                { id: 5, topic: 'Утренняя бодрость', text: 'Просыпаетесь ли вы уставшим, даже проспав достаточно часов?' },
-                { id: 6, topic: 'Дневная сонливость', text: 'Клонит ли вас в сон в течение дня?' },
-                { id: 7, topic: 'Тревожные мысли перед сном', text: 'Прокручиваете ли вы тревожные мысли, лёжа в постели?' },
-                { id: 8, topic: 'Стимуляторы', text: 'Употребляете ли вы кофеин во второй половине дня?' },
-                { id: 9, topic: 'Продолжительность сна', text: 'Спите ли вы меньше 7 часов в большинстве ночей?' },
-                { id: 10, topic: 'Обстановка для сна', text: 'Мешают ли вам заснуть свет, шум или неудобная обстановка?' },
-                { id: 11, topic: 'Восстановление', text: 'Чувствуете ли вы, что сон не восстанавливает силы, как раньше?' }
-            ],
-            scoreToResult(score) {
-                if (score <= 11) return { status: 'Сон в норме', desc: 'Судя по ответам, сон восстанавливает силы и не создаёт проблем.', recs: ['Сохраняйте текущий режим — он работает.', 'Отмечайте сон в чек-листе, чтобы вовремя заметить отклонения.'] };
-                if (score <= 22) return { status: 'Умеренные нарушения сна', desc: 'Периодически сон сбивается, но пока это не критично.', recs: ['Попробуйте убирать экраны за 30-60 минут до сна.', 'Дыхание 4-7-8 из раздела «Практики» помогает быстрее заснуть.'] };
-                if (score <= 33) return { status: 'Заметные нарушения сна', desc: 'Качество сна регулярно страдает и, вероятно, уже влияет на самочувствие днём.', recs: ['Постарайтесь ложиться и вставать в одно и то же время, даже в выходные.', 'Ограничьте кофеин после обеда.'] };
-                return { status: 'Серьёзные нарушения сна', desc: 'Сон систематически не восстанавливает силы — это стоит внимания.', recs: ['Если проблема длится больше месяца — обсудите её со специалистом (раздел «Советы»).', 'Ведите дневник сна и самочувствия, чтобы увидеть закономерности.'] };
-            }
-        }
-    };
+    // 30 тестов приходят из assets/tests-data.js (window.BM_TESTS). Механика
+    // общая: шкала 0-4, результат — доля от максимума (кол-во вопросов×4),
+    // диапазон по квартилям. Результат (0-100%) хранится под testId в test_results.
+    const CATS = ['Все', ...Array.from(new Set(TESTS.map((t) => t.cat)))];
+    let activeCat = 'Все';
+    let current = null;
 
-    let activeTestId = 'stress';
+    const catalogEl = document.getElementById('sa-catalog');
+    const testViewEl = document.getElementById('sa-test-view');
+    const gridEl = document.getElementById('sa-catalog-grid');
     const form = document.getElementById('quiz-form');
 
-    function renderTabs() {
-        const tabsEl = document.getElementById('sa-test-tabs');
-        tabsEl.innerHTML = '';
-        Object.entries(TEST_DEFINITIONS).forEach(([id, def]) => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'sa-test-tab' + (id === activeTestId ? ' active' : '');
-            btn.textContent = def.label;
-            btn.addEventListener('click', () => {
-                if (id === activeTestId) return;
-                activeTestId = id;
-                renderTabs();
-                renderQuiz();
-                renderHistory();
-                document.getElementById('sa-result').style.display = 'none';
-            });
-            tabsEl.appendChild(btn);
+    function bandFor(test, frac) {
+        const idx = frac <= 0.25 ? 0 : frac <= 0.5 ? 1 : frac <= 0.75 ? 2 : 3;
+        return test.bands[idx];
+    }
+
+    function renderCatFilter() {
+        const el = document.getElementById('sa-cat-filter');
+        el.innerHTML = '';
+        CATS.forEach((c) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = c === activeCat ? 'active' : '';
+            b.textContent = c;
+            b.addEventListener('click', () => { activeCat = c; renderCatFilter(); renderCatalog(); });
+            el.appendChild(b);
         });
     }
 
-    function renderQuiz() {
-        const def = TEST_DEFINITIONS[activeTestId];
-        document.getElementById('sa-hero-desc').textContent = def.heroDesc;
-        document.getElementById('sa-history-title').textContent = def.historyTitle;
+    async function renderCatalog() {
+        gridEl.innerHTML = '';
+        const shown = TESTS.filter((t) => activeCat === 'Все' || t.cat === activeCat);
+        const doneMap = {};
+        try {
+            const all = await Promise.all(shown.map((t) => BM.PersonalData.getTestResults(t.id).then((r) => [t.id, r.length]).catch(() => [t.id, 0])));
+            all.forEach(([id, n]) => { doneMap[id] = n; });
+        } catch {}
+        shown.forEach((t) => {
+            const card = document.createElement('div');
+            card.className = 'glass-card sa-test-card';
+            const icon = document.createElement('div'); icon.className = 'sa-test-icon'; icon.textContent = t.icon;
+            const cat = document.createElement('span'); cat.className = 'sa-test-cat'; cat.textContent = t.cat;
+            const h = document.createElement('h3'); h.textContent = t.label;
+            const p = document.createElement('p'); p.textContent = t.intro;
+            card.append(icon, cat, h, p);
+            if (doneMap[t.id]) {
+                const done = document.createElement('div'); done.className = 'sa-test-done';
+                done.textContent = '✓ пройден ' + doneMap[t.id] + ' раз(а)';
+                card.appendChild(done);
+            }
+            card.addEventListener('click', () => openTest(t));
+            gridEl.appendChild(card);
+        });
+    }
+
+    function openTest(test) {
+        current = test;
+        catalogEl.style.display = 'none';
+        testViewEl.style.display = 'block';
+        document.getElementById('sa-test-title').textContent = test.icon + ' ' + test.label;
+        document.getElementById('sa-test-intro').textContent = test.intro;
+        document.getElementById('sa-result').style.display = 'none';
         form.innerHTML = '';
-        def.questions.forEach((q) => {
+        test.q.forEach((text, i) => {
             const wrap = document.createElement('div');
             wrap.className = 'glass-card sa-question';
-            const optionsHtml = scales.map((label, i) => `
-                <label><input type="radio" name="q${q.id}" value="${i}" required>${label}</label>
-            `).join('');
-            wrap.innerHTML = `<p class="topic">${q.topic}</p><p class="text">${q.text}</p><div class="sa-scale">${optionsHtml}</div>`;
+            const opts = scales.map((label, v) => '<label><input type="radio" name="q' + i + '" value="' + v + '" required>' + label + '</label>').join('');
+            const p1 = document.createElement('p'); p1.className = 'topic'; p1.textContent = 'Вопрос ' + (i + 1) + ' из ' + test.q.length;
+            const p2 = document.createElement('p'); p2.className = 'text'; p2.textContent = text;
+            const sc = document.createElement('div'); sc.className = 'sa-scale'; sc.innerHTML = opts;
+            wrap.append(p1, p2, sc);
             form.appendChild(wrap);
         });
         document.getElementById('sa-error').style.display = 'none';
+        renderHistory();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function backToCatalog() {
+        current = null;
+        testViewEl.style.display = 'none';
+        catalogEl.style.display = 'block';
+        renderCatalog();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     async function renderHistory() {
-        const results = await BM.PersonalData.getTestResults(activeTestId);
+        if (!current) return;
+        const results = await BM.PersonalData.getTestResults(current.id);
         const empty = document.getElementById('sa-history-empty');
         const table = document.getElementById('sa-history-table');
         const body = document.getElementById('sa-history-body');
@@ -324,39 +242,42 @@ document.addEventListener('DOMContentLoaded', () => {
         body.innerHTML = '';
         results.slice().reverse().forEach((r) => {
             const tr = document.createElement('tr');
-            const tdDate = document.createElement('td'); tdDate.textContent = r.date;
-            const tdScore = document.createElement('td'); tdScore.textContent = `${r.score}/44`;
-            const tdStatus = document.createElement('td'); tdStatus.textContent = r.status;
-            tr.append(tdDate, tdScore, tdStatus);
+            const td1 = document.createElement('td'); td1.textContent = r.date;
+            const td2 = document.createElement('td'); td2.textContent = (r.score || 0) + '%';
+            const td3 = document.createElement('td'); td3.textContent = r.status;
+            tr.append(td1, td2, td3);
             body.appendChild(tr);
         });
     }
 
+    document.getElementById('sa-back').addEventListener('click', backToCatalog);
+
     document.getElementById('sa-submit').addEventListener('click', async (e) => {
-        const def = TEST_DEFINITIONS[activeTestId];
+        if (!current) return;
         const submitBtn = e.currentTarget;
         if (submitBtn.disabled) return;
         const data = new FormData(form);
         let total = 0; let count = 0;
         data.forEach((v) => { total += Number(v); count += 1; });
-        if (count < def.questions.length) {
-            document.getElementById('sa-error').style.display = 'block';
-            return;
-        }
+        if (count < current.q.length) { document.getElementById('sa-error').style.display = 'block'; return; }
         document.getElementById('sa-error').style.display = 'none';
         submitBtn.disabled = true;
         try {
-            const { status, desc, recs } = def.scoreToResult(total);
-            document.getElementById('sa-score').textContent = total;
-            document.getElementById('sa-bar').style.width = `${(total / 44) * 100}%`;
-            document.getElementById('sa-status').textContent = status;
-            document.getElementById('sa-desc').textContent = desc;
+            const max = current.q.length * 4;
+            const frac = total / max;
+            const percent = Math.round(frac * 100);
+            const b = bandFor(current, frac);
+            document.getElementById('sa-score').textContent = percent + '%';
+            document.getElementById('sa-score-raw').textContent = total + ' из ' + max + ' баллов';
+            document.getElementById('sa-bar').style.width = percent + '%';
+            document.getElementById('sa-status').textContent = b.status;
+            document.getElementById('sa-desc').textContent = b.desc;
             const recsList = document.getElementById('sa-recs');
             recsList.innerHTML = '';
-            recs.forEach((r) => { const li = document.createElement('li'); li.textContent = r; recsList.appendChild(li); });
+            b.recs.forEach((r) => { const li = document.createElement('li'); li.textContent = r; recsList.appendChild(li); });
             document.getElementById('sa-result').style.display = 'block';
             document.getElementById('sa-result').scrollIntoView({ behavior: 'smooth' });
-            await BM.PersonalData.saveTestResult(activeTestId, total, status, new Date().toLocaleDateString('ru-RU'), new Date().toISOString());
+            await BM.PersonalData.saveTestResult(current.id, percent, b.status, new Date().toLocaleDateString('ru-RU'), new Date().toISOString());
             renderHistory();
         } finally {
             submitBtn.disabled = false;
@@ -368,8 +289,8 @@ document.addEventListener('DOMContentLoaded', () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
-    renderTabs();
-    renderQuiz();
+    renderCatFilter();
+    renderCatalog();
 
     // Настроение
     const moodRow = document.getElementById('sa-mood-row');
